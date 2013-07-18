@@ -36,6 +36,7 @@
 #include "../ViewPageDllMacro.h"
 
 class AlbumModel;
+class SessionHistoryModel;
 class RecentlyPlayedModel;
 class OverlayWidget;
 class BasicHeader;
@@ -73,6 +74,7 @@ private slots:
     void onSourcesReady();
     void onSourceAdded( const Tomahawk::source_ptr& source );
     void onPlaylistActivated( const QModelIndex& );
+    void onSessionDoubleClicked(const QModelIndex &index);
 
 protected:
     void changeEvent( QEvent* e );
@@ -81,6 +83,7 @@ private:
     Ui::DashboardWidget *ui;
 
     RecentlyPlayedModel* m_tracksModel;
+    SessionHistoryModel* m_sessionsModel;
     AlbumModel* m_recentAlbumsModel;
     Tomahawk::playlistinterface_ptr m_playlistInterface;
 };

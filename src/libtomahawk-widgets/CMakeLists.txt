@@ -3,6 +3,7 @@ set(TOMAHAWK_WIDGETS_LIBRARY_TARGET tomahawk-widgets)
 
 list(APPEND ${TOMAHAWK_WIDGETS_LIBRARY_TARGET}_SOURCES
     PlaylistDelegate.cpp
+    SessionsDelegate.cpp
     PlaylistWidget.cpp
     SocialPlaylistWidget.cpp
 )

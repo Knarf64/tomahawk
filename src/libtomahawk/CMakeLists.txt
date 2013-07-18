@@ -78,6 +78,7 @@ set( libGuiSources
     playlist/TopLovedTracksModel.cpp
     playlist/RecentlyAddedModel.cpp
     playlist/RecentlyPlayedModel.cpp
+    playlist/SessionHistoryModel.cpp
     playlist/AlbumItemDelegate.cpp
     playlist/PlaylistLargeItemDelegate.cpp
     playlist/PlaylistChartItemDelegate.cpp
@@ -204,6 +205,7 @@ list(APPEND libSources
     MetaPlaylistInterface.cpp
     Query.cpp
     Result.cpp
+    Session.cpp
     Source.cpp
     Track.cpp
     TrackData.cpp
@@ -285,6 +287,7 @@ list(APPEND libSources
     database/DatabaseCommand_NetworkCharts.cpp
     database/DatabaseCommand_PlaybackCharts.cpp
     database/DatabaseCommand_PlaybackHistory.cpp
+    database/DatabaseCommand_PlaybackHistorySessions.cpp
     database/DatabaseCommand_RenamePlaylist.cpp
     database/DatabaseCommand_Resolve.cpp
     database/DatabaseCommand_SetCollectionAttributes.cpp
