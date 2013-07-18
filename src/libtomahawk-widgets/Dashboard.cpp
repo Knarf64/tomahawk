@@ -61,6 +61,7 @@ Dashboard::Dashboard( QWidget* parent )
     ui->lineBelow->setStyleSheet( QString( "QFrame { border: 1px solid %1; }" ).arg( TomahawkStyle::HEADER_BACKGROUND.name() ) );
 
     {
+        // TO REMOVE when replaced
         m_tracksModel = new RecentlyPlayedModel( ui->tracksView, HISTORY_TRACK_ITEMS );
         ui->tracksView->proxyModel()->setStyle( PlayableProxyModel::ShortWithAvatars );
         ui->tracksView->overlay()->setEnabled( false );
@@ -68,6 +69,13 @@ Dashboard::Dashboard( QWidget* parent )
         ui->tracksView->setAutoResize( true );
         ui->tracksView->setAlternatingRowColors( false );
         m_tracksModel->setSource( source_ptr() );
+
+        /*
+        m_sessionsModel = new SessionHistoryModel(ui->sessionsView) ; // change to add the argument !
+        ui->sessionsView->setItemDelegate( new SessionDelegate(ui->sessionsView) );
+        ui->sessionsView->setModel( m_sessionsModel );
+        m_sessionsModel->setSource( source_ptr() );
+        */
 
         QPalette p = ui->tracksView->palette();
         p.setColor( QPalette::Text, TomahawkStyle::PAGE_TRACKLIST_TRACK_SOLVED );
@@ -265,6 +273,19 @@ Dashboard::onPlaylistActivated( const QModelIndex& item )
         ViewManager::instance()->show( pl );
 }
 
+void Dashboard::onSessionDoubleClicked(const QModelIndex &index)
+{
+    /*
+    // Retrieve Session and fill the playlist
+    Session* mySession = index.data(SessionHistoryModel::SessionItemRole).value<Session*>() ;
+    source_ptr author = mySession->getSessionSource() ;
+    QString title = "Session from : "+author->friendlyName() ;
+    QList<Tomahawk::query_ptr> queries =  mySession->getTrackstoQuery() ;
+
+    Tomahawk::ViewPage* view = ViewManager::instance()->createPageForList( title, queries );
+    ViewManager::instance()->show( view );
+*/
+}
 
 void
 Dashboard::changeEvent( QEvent* e )
