@@ -40,15 +40,22 @@
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
 
+#include "ViewPage.h"
+#include "libtomahawk/Session.h"
+#include "Session.h"
+#include "libtomahawk/playlist/FlexibleView.h"
+#include "libtomahawk/Session.h"
+#include "SessionsDelegate.h"
+#include "libtomahawk/playlist/SessionHistoryModel.h"
+
 #include <QPainter>
 #include <QScrollArea>
 
 #define HISTORY_PLAYLIST_ITEMS 10
 #define HISTORY_TRACK_ITEMS 15
 
-using namespace Tomahawk;
+using namespace Tomahawk ;
 using namespace Tomahawk::Widgets;
-
 
 Dashboard::Dashboard( QWidget* parent )
     : QWidget( parent )
@@ -61,6 +68,7 @@ Dashboard::Dashboard( QWidget* parent )
     ui->lineBelow->setStyleSheet( QString( "QFrame { border: 1px solid %1; }" ).arg( TomahawkStyle::HEADER_BACKGROUND.name() ) );
 
     {
+        /*
         // TO REMOVE when replaced
         m_tracksModel = new RecentlyPlayedModel( ui->tracksView, HISTORY_TRACK_ITEMS );
         ui->tracksView->proxyModel()->setStyle( PlayableProxyModel::ShortWithAvatars );
@@ -69,26 +77,37 @@ Dashboard::Dashboard( QWidget* parent )
         ui->tracksView->setAutoResize( true );
         ui->tracksView->setAlternatingRowColors( false );
         m_tracksModel->setSource( source_ptr() );
-
-        /*
-        m_sessionsModel = new SessionHistoryModel(ui->sessionsView) ; // change to add the argument !
-        ui->sessionsView->setItemDelegate( new SessionDelegate(ui->sessionsView) );
-        ui->sessionsView->setModel( m_sessionsModel );
-        m_sessionsModel->setSource( source_ptr() );
         */
 
-        QPalette p = ui->tracksView->palette();
+        m_sessionsModel = new SessionHistoryModel(ui->sessionsView) ; // change to add the argument !
+        SessionDelegate *del =  new SessionDelegate();
+        del->setView(ui->sessionsView);
+        //ui->sessionsView->setItemDelegate( new SessionDelegate(ui->sessionsView) );
+        ui->sessionsView->setItemDelegate(del);
+        ui->sessionsView->setModel( m_sessionsModel );
+        m_sessionsModel->setSource( source_ptr() );
+
+
+        //QPalette p = ui->tracksView->palette();
+        QPalette p = ui->sessionsView->palette();
         p.setColor( QPalette::Text, TomahawkStyle::PAGE_TRACKLIST_TRACK_SOLVED );
         p.setColor( QPalette::BrightText, TomahawkStyle::PAGE_TRACKLIST_TRACK_UNRESOLVED );
         p.setColor( QPalette::Foreground, TomahawkStyle::PAGE_TRACKLIST_NUMBER );
         p.setColor( QPalette::Highlight, TomahawkStyle::PAGE_TRACKLIST_HIGHLIGHT );
         p.setColor( QPalette::HighlightedText, TomahawkStyle::PAGE_TRACKLIST_HIGHLIGHT_TEXT );
 
+        ui->sessionsView->setPalette( p );
+        ui->sessionsView->setFrameShape( QFrame::NoFrame );
+        ui->sessionsView->setAttribute( Qt::WA_MacShowFocusRect, 0 );
+        ui->sessionsView->setStyleSheet( "QTreeView { background-color: transparent; }" );
+        TomahawkStyle::stylePageFrame( ui->sessionFrame );
+        /*
         ui->tracksView->setPalette( p );
-        ui->tracksView->setFrameShape( QFrame::NoFrame );
+        ui->    ->setFrameShape( QFrame::NoFrame );
         ui->tracksView->setAttribute( Qt::WA_MacShowFocusRect, 0 );
         ui->tracksView->setStyleSheet( "QTreeView { background-color: transparent; }" );
         TomahawkStyle::stylePageFrame( ui->trackFrame );
+        */
     }
 
     {
@@ -117,6 +136,7 @@ Dashboard::Dashboard( QWidget* parent )
         updatePlaylists();
         connect( ui->playlistWidget, SIGNAL( activated( QModelIndex ) ), SLOT( onPlaylistActivated( QModelIndex ) ) );
         connect( model, SIGNAL( emptinessChanged( bool ) ), this, SLOT( updatePlaylists() ) );
+        
     }
 
     {
@@ -180,12 +200,13 @@ Dashboard::Dashboard( QWidget* parent )
     }
 
     MetaPlaylistInterface* mpl = new MetaPlaylistInterface();
-    mpl->addChildInterface( ui->tracksView->playlistInterface() );
+    //mpl->addChildInterface( ui->tracksView->playlistInterface() );
+    //mpl->addChildInterface( ui->sessionsView->playlistInterface() );
     mpl->addChildInterface( ui->additionsView->playlistInterface() );
     m_playlistInterface = playlistinterface_ptr( mpl );
 
     connect( SourceList::instance(), SIGNAL( ready() ), SLOT( onSourcesReady() ) );
-    connect( SourceList::instance(), SIGNAL( sourceAdded( Tomahawk::source_ptr ) ), SLOT( onSourceAdded( Tomahawk::source_ptr ) ) );
+    connect( SourceList::instance(), SIGNAL( sourceAdded( source_ptr ) ), SLOT( onSourceAdded( Tomahawk::source_ptr ) ) );
 }
 
 
@@ -205,8 +226,8 @@ Dashboard::playlistInterface() const
 bool
 Dashboard::jumpToCurrentTrack()
 {
-    if ( ui->tracksView->jumpToCurrentTrack() )
-        return true;
+//     if ( ui->tracksView->jumpToCurrentTrack() )
+//         return true;
 
     if ( ui->additionsView->jumpToCurrentTrack() )
         return true;
@@ -218,10 +239,11 @@ Dashboard::jumpToCurrentTrack()
 bool
 Dashboard::isBeingPlayed() const
 {
-    if ( ui->additionsView->isBeingPlayed() )
+    return ui->additionsView->isBeingPlayed();
+    /*if ( ui->additionsView->isBeingPlayed() )
         return true;
 
-    return AudioEngine::instance()->currentTrackPlaylist() == ui->tracksView->playlistInterface();
+    return AudioEngine::instance()->currentTrackPlaylist() == ui->tracksView->playlistInterface();*/
 }
 
 
@@ -273,20 +295,6 @@ Dashboard::onPlaylistActivated( const QModelIndex& item )
         ViewManager::instance()->show( pl );
 }
 
-void Dashboard::onSessionDoubleClicked(const QModelIndex &index)
-{
-    /*
-    // Retrieve Session and fill the playlist
-    Session* mySession = index.data(SessionHistoryModel::SessionItemRole).value<Session*>() ;
-    source_ptr author = mySession->getSessionSource() ;
-    QString title = "Session from : "+author->friendlyName() ;
-    QList<Tomahawk::query_ptr> queries =  mySession->getTrackstoQuery() ;
-
-    Tomahawk::ViewPage* view = ViewManager::instance()->createPageForList( title, queries );
-    ViewManager::instance()->show( view );
-*/
-}
-
 void
 Dashboard::changeEvent( QEvent* e )
 {
@@ -307,4 +315,18 @@ QPixmap
 Dashboard::pixmap() const
 {
     return ImageRegistry::instance()->pixmap( RESPATH "images/dashboard.svg", QSize( 0, 0 ) );
+}
+
+void
+Dashboard::onSessionDoubleClicked( const QModelIndex &index )
+{
+    // Retrieve Session and fill the playlist
+    Session* mySession = index.data(SessionHistoryModel::SessionItemRole).value<Session*>() ;
+    source_ptr author = mySession->getSessionSource();
+    //TODO : make the link inside the Cmake
+    QString title = "Session from : "+author->friendlyName() ;
+    QList<query_ptr> queries =  mySession->getTrackstoQuery() ;
+
+    FlexibleView *view = ViewManager::instance()->createPageForList( title, queries );
+    ViewManager::instance()->show( view );
 }

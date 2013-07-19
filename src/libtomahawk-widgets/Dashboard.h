@@ -35,7 +35,7 @@
 #include "WidgetsDllMacro.h"
 
 class AlbumModel;
-class SessionHistoryModel;
+
 class RecentlyPlayedModel;
 class OverlayWidget;
 class BasicHeader;
@@ -47,6 +47,7 @@ namespace Ui
 
 namespace Tomahawk
 {
+    class SessionHistoryModel;
 namespace Widgets
 {
 
@@ -79,12 +80,13 @@ signals:
 public slots:
     void updatePlaylists();
     void updateRecentAdditions();
+    void onSessionDoubleClicked(const QModelIndex &index);
 
 private slots:
     void onSourcesReady();
     void onSourceAdded( const Tomahawk::source_ptr& source );
     void onPlaylistActivated( const QModelIndex& );
-    void onSessionDoubleClicked(const QModelIndex &index);
+
 
 private:
     Ui::Dashboard *ui;
