@@ -53,7 +53,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QFrame" name="trackFrame">
+         <widget class="QFrame" name="sessionFrame">
           <property name="frameShape">
            <enum>QFrame::StyledPanel</enum>
           </property>
@@ -94,15 +94,12 @@
             </widget>
            </item>
            <item>
-            <widget class="PlaylistView" name="tracksView">
+            <widget class="QListView" name="sessionsView">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
-             </property>
-             <property name="headerHidden">
-              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -285,11 +282,6 @@
   </layout>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>PlaylistView</class>
-   <extends>QTreeView</extends>
-   <header location="global">playlist/PlaylistView.h</header>
-  </customwidget>
   <customwidget>
    <class>GridView</class>
    <extends>QListView</extends>
