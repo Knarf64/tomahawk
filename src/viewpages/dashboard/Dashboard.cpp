@@ -91,17 +91,14 @@ DashboardWidget::DashboardWidget( QWidget* parent )
         ui->tracksView->setAlternatingRowColors( false );
         m_tracksModel->setSource( source_ptr() );
         */
+        m_sessionsModel = new SessionHistoryModel(ui->sessionsView) ;
 
-        m_sessionsModel = new SessionHistoryModel(ui->sessionsView) ; // change to add the argument !
         SessionDelegate *del =  new SessionDelegate();
         del->setView(ui->sessionsView);
-        //ui->sessionsView->setItemDelegate( new SessionDelegate(ui->sessionsView) );
         ui->sessionsView->setItemDelegate(del);
         ui->sessionsView->setModel( m_sessionsModel );
         m_sessionsModel->setSource( source_ptr() );
 
-
-        //QPalette p = ui->tracksView->palette();
         QPalette p = ui->sessionsView->palette();
         p.setColor( QPalette::Text, TomahawkStyle::PAGE_TRACKLIST_TRACK_SOLVED );
         p.setColor( QPalette::BrightText, TomahawkStyle::PAGE_TRACKLIST_TRACK_UNRESOLVED );
@@ -150,7 +147,7 @@ DashboardWidget::DashboardWidget( QWidget* parent )
         updatePlaylists();
         connect( ui->playlistWidget, SIGNAL( activated( QModelIndex ) ), SLOT( onPlaylistActivated( QModelIndex ) ) );
         connect( model, SIGNAL( emptinessChanged( bool ) ), this, SLOT( updatePlaylists() ) );
-        
+        connect( ui->sessionsView, SIGNAL(clicked(const QModelIndex&)), this, SLOT( onSessionDoubleClicked( const QModelIndex& ) ) );
     }
 
     {
@@ -214,8 +211,6 @@ DashboardWidget::DashboardWidget( QWidget* parent )
     }
 
     MetaPlaylistInterface* mpl = new MetaPlaylistInterface();
-    //mpl->addChildInterface( ui->tracksView->playlistInterface() );
-    //mpl->addChildInterface( ui->sessionsView->playlistInterface() );
     mpl->addChildInterface( ui->additionsView->playlistInterface() );
     m_playlistInterface = playlistinterface_ptr( mpl );
 
@@ -240,9 +235,6 @@ DashboardWidget::playlistInterface() const
 bool
 DashboardWidget::jumpToCurrentTrack()
 {
-//     if ( ui->tracksView->jumpToCurrentTrack() )
-//         return true;
-
     if ( ui->additionsView->jumpToCurrentTrack() )
         return true;
 
@@ -254,10 +246,6 @@ bool
 DashboardWidget::isBeingPlayed() const
 {
     return ui->additionsView->isBeingPlayed();
-    /*if ( ui->additionsView->isBeingPlayed() )
-        return true;
-
-    return AudioEngine::instance()->currentTrackPlaylist() == ui->tracksView->playlistInterface();*/
 }
 
 
@@ -337,8 +325,7 @@ Dashboard::onSessionDoubleClicked( const QModelIndex &index )
     // Retrieve Session and fill the playlist
     Session* mySession = index.data(SessionHistoryModel::SessionItemRole).value<Session*>() ;
     source_ptr author = mySession->getSessionSource();
-    //TODO : make the link inside the Cmake
-    QString title = "Session from : "+author->friendlyName() ;
+    QString title = author->friendlyName()+"' "+"Session : "+mySession->getPredominantArtist() ;
     QList<query_ptr> queries =  mySession->getTrackstoQuery() ;
 
     FlexibleView *view = ViewManager::instance()->createPageForList( title, queries );

@@ -82,9 +82,11 @@ protected:
     void changeEvent( QEvent* e );
 
 private:
+<<<<<<< HEAD:src/viewpages/dashboard/Dashboard.h
     Ui::DashboardWidget *ui;
 
     RecentlyPlayedModel* m_tracksModel;
+    Ui::Dashboard *ui;
     SessionHistoryModel* m_sessionsModel;
     AlbumModel* m_recentAlbumsModel;
     Tomahawk::playlistinterface_ptr m_playlistInterface;

@@ -86,7 +86,7 @@
               </font>
              </property>
              <property name="text">
-              <string>Recently Played Tracks</string>
+              <string>Recently Played Sessions</string>
              </property>
              <property name="margin">
               <number>0</number>
