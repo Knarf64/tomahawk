@@ -3,10 +3,12 @@ set(TOMAHAWK_WIDGETS_LIBRARY_TARGET tomahawk-widgets)
 
 list(APPEND ${TOMAHAWK_WIDGETS_LIBRARY_TARGET}_SOURCES
     PlaylistDelegate.cpp
+    SessionsDelegate.cpp
     PlaylistWidget.cpp
 
     # ViewPages
     Dashboard.cpp
+    ../libtomahawk/Session.cpp
     NetworkActivityWidget.cpp
     NetworkActivityWorker.cpp
     SocialPlaylistWidget.cpp
@@ -25,3 +27,4 @@ tomahawk_add_library(${TOMAHAWK_WIDGETS_LIBRARY_TARGET}
     EXPORT TomahawkLibraryDepends
     VERSION ${TOMAHAWK_VERSION_SHORT}
 )
+
