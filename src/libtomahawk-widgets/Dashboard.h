@@ -90,8 +90,6 @@ private slots:
 
 private:
     Ui::Dashboard *ui;
-
-    RecentlyPlayedModel* m_tracksModel;
     SessionHistoryModel* m_sessionsModel;
     AlbumModel* m_recentAlbumsModel;
     Tomahawk::playlistinterface_ptr m_playlistInterface;
