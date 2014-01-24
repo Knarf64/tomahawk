@@ -3,7 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
- *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2013-2014, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -37,7 +37,6 @@
 #include "playlist/XspfUpdater.h"
 #include "network/Servent.h"
 #include "network/DbSyncConnection.h"
-#include "web/Api_v1.h"
 #include "SourceList.h"
 #include "ViewManager.h"
 #include "ShortcutHandler.h"
@@ -70,6 +69,7 @@
 #include "utils/Logger.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/TomahawkCache.h"
+#include "widgets/SplashWidget.h"
 
 #ifndef ENABLE_HEADLESS
     #include "resolvers/JSResolver.h"
@@ -77,7 +77,7 @@
     #include "utils/SpotifyParser.h"
     #include "AtticaManager.h"
     #include "TomahawkWindow.h"
-    #include "SettingsDialog.h"
+    #include "dialogs/SettingsDialog.h"
     #include "ActionCollection.h"
     #include "widgets/HeaderLabel.h"
     #include "TomahawkSettingsGui.h"
@@ -104,7 +104,6 @@
 #include <sys/sysctl.h>
 #endif
 
-#include <QPluginLoader>
 #include <QDir>
 #include <QMetaType>
 #include <QTime>
@@ -150,6 +149,7 @@ TomahawkApp::TomahawkApp( int& argc, char *argv[] )
     , m_mainwindow( 0 )
 #endif
     , m_headless( false )
+    , m_splashWidget( 0 )
 {
     if ( arguments().contains( "--help" ) || arguments().contains( "-h" ) )
     {
@@ -183,14 +183,23 @@ TomahawkApp::init()
     setWindowIcon( QIcon( RESPATH "icons/tomahawk-icon-128x128.png" ) );
     setQuitOnLastWindowClosed( false );
 
+    if ( arguments().contains( "--splash" ) )
+    {
+        startSplashWidget( "Splash screen test\n" );
+        updateSplashWidgetMessage( "Splash screen test\n2/7" );
+    }
+
     QFont f = font();
 #ifdef Q_OS_MAC
     f.setPointSize( f.pointSize() - 2 );
     setFont( f );
 #endif
 
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
     tDebug() << "Default font:" << f.pixelSize() << f.pointSize() << f.pointSizeF() << f.family();
+    // The following line blocks for 15s on Qt 5.1.0
     tDebug() << "Font height:" << QFontMetrics( f ).height();
+#endif
     TomahawkUtils::setDefaultFontSize( f.pointSize() );
 #endif
 
@@ -209,7 +218,7 @@ TomahawkApp::init()
     Tomahawk::Utils::setProxyNoProxyHosts( s->proxyNoProxyHosts() );
 
     // Cause the creation of the nam, but don't need to address it directly, so prevent warning
-    Q_UNUSED( Tomahawk::Utils::nam() );
+    tDebug() << "Setting NAM:" << Tomahawk::Utils::nam();
 
     m_audioEngine = QPointer<AudioEngine>( new AudioEngine );
 
@@ -285,11 +294,6 @@ TomahawkApp::init()
 TomahawkApp::~TomahawkApp()
 {
     tDebug( LOGVERBOSE ) << "Shutting down Tomahawk...";
-
-    if ( !m_httpv1_session.isNull() )
-        delete m_httpv1_session.data();
-    if ( !m_httpv1_connector.isNull() )
-        delete m_httpv1_connector.data();
 
     if ( Pipeline::instance() )
         Pipeline::instance()->stop();
@@ -476,6 +480,8 @@ TomahawkApp::initDatabase()
 
     tDebug( LOGEXTRA ) << "Using database:" << dbpath;
     m_database = QPointer<Tomahawk::Database>( new Tomahawk::Database( dbpath, this ) );
+    // this also connects dbImpl schema update signals
+
     Pipeline::instance()->databaseReady();
 }
 
@@ -483,43 +489,14 @@ TomahawkApp::initDatabase()
 void
 TomahawkApp::initHTTP()
 {
-    if ( !TomahawkSettings::instance()->httpEnabled() )
+    if ( TomahawkSettings::instance()->httpEnabled() )
     {
-        tLog() << "Stopping HTTPd, not enabled";
-        if ( !m_httpv1_session.isNull() )
-            delete m_httpv1_session.data();
-        if ( !m_httpv1_connector.isNull() )
-            delete m_httpv1_connector.data();
-        return;
+        if ( playdarApi.isNull() )
+        {
+            playdarApi = new PlaydarApi( QHostAddress::LocalHost, 60210, this ); // TODO Config
+        }
+        playdarApi->start();
     }
-
-    if ( m_httpv1_session )
-    {
-        tLog() << "HTTPd session already exists, returning";
-        return;
-    }
-
-    m_httpv1_session = QPointer< QxtHttpSessionManager >( new QxtHttpSessionManager() );
-    m_httpv1_connector = QPointer< QxtHttpServerConnector >( new QxtHttpServerConnector );
-    if ( m_httpv1_session.isNull() || m_httpv1_connector.isNull() )
-    {
-        if ( !m_httpv1_session.isNull() )
-            delete m_httpv1_session.data();
-        if ( !m_httpv1_connector.isNull() )
-            delete m_httpv1_connector.data();
-        tLog() << "Failed to start HTTPd, could not create object";
-        return;
-    }
-
-    m_httpv1_session.data()->setPort( 60210 ); //TODO config
-    m_httpv1_session.data()->setListenInterface( QHostAddress::LocalHost );
-    m_httpv1_session.data()->setConnector( m_httpv1_connector.data() );
-
-    Api_v1* api = new Api_v1( m_httpv1_session.data() );
-    m_httpv1_session.data()->setStaticContentService( api );
-
-    tLog() << "Starting HTTPd on" << m_httpv1_session.data()->listenInterface().toString() << m_httpv1_session.data()->port();
-    m_httpv1_session.data()->start();
 }
 
 
@@ -716,6 +693,60 @@ TomahawkApp::onInfoSystemReady()
 
 
 void
+TomahawkApp::onSchemaUpdateStarted()
+{
+    startSplashWidget( tr( "Updating database\n") );
+}
+
+
+void
+TomahawkApp::onSchemaUpdateStatus( const QString& status )
+{
+    updateSplashWidgetMessage( tr("Updating database\n%1" ).arg( status ) );
+}
+
+
+void
+TomahawkApp::onSchemaUpdateDone()
+{
+    killSplashWidget();
+}
+
+
+void
+TomahawkApp::startSplashWidget( const QString& initialMessage )
+{
+    tDebug() << Q_FUNC_INFO;
+    m_splashWidget = new SplashWidget();
+    m_splashWidget->showMessage( initialMessage );
+    m_splashWidget->show();
+}
+
+
+void
+TomahawkApp::updateSplashWidgetMessage( const QString& message )
+{
+    if ( m_splashWidget )
+    {
+        m_splashWidget->showMessage( message );
+    }
+}
+
+
+void
+TomahawkApp::killSplashWidget()
+{
+    tDebug() << Q_FUNC_INFO;
+    if ( m_splashWidget )
+    {
+        m_splashWidget->finish( mainWindow() );
+        m_splashWidget->deleteLater();
+    }
+    m_splashWidget = 0;
+}
+
+
+void
 TomahawkApp::ipDetectionFailed( QNetworkReply::NetworkError error, QString errorString )
 {
     Q_UNUSED( error );
@@ -752,23 +783,26 @@ TomahawkApp::activate()
 bool
 TomahawkApp::loadUrl( const QString& url )
 {
-    QFile f( url );
-    QFileInfo info( f );
-    if ( info.suffix() == "xspf" )
+    if ( !url.startsWith( "tomahawk://" ) )
     {
-        XSPFLoader* l = new XSPFLoader( true, this );
-        tDebug( LOGINFO ) << "Loading spiff:" << url;
-        l->load( QUrl::fromUserInput( url ) );
+        QFile f( url );
+        QFileInfo info( f );
+        if ( info.suffix() == "xspf" )
+        {
+            XSPFLoader* l = new XSPFLoader( true, this );
+            tDebug( LOGINFO ) << "Loading spiff:" << url;
+            l->load( QUrl::fromUserInput( url ) );
 
-        return true;
-    }
-    else if ( info.suffix() == "jspf" )
-    {
-        JSPFLoader* l = new JSPFLoader( true, this );
-        tDebug( LOGINFO ) << "Loading j-spiff:" << url;
-        l->load( QUrl::fromUserInput( url ) );
+            return true;
+        }
+        else if ( info.suffix() == "jspf" )
+        {
+            JSPFLoader* l = new JSPFLoader( true, this );
+            tDebug( LOGINFO ) << "Loading j-spiff:" << url;
+            l->load( QUrl::fromUserInput( url ) );
 
-        return true;
+            return true;
+        }
     }
 
     return GlobalActionManager::instance()->openUrl( url );

@@ -3,6 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2014,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,8 +22,9 @@
 #include "DatabaseImpl.h"
 
 #include "database/Database.h"
-#include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
+#include "utils/ResultUrlChecker.h"
+#include "utils/TomahawkUtils.h"
 
 #include "Album.h"
 #include "Artist.h"
@@ -46,12 +48,20 @@
 */
 #include "Schema.sql.h"
 
-#define CURRENT_SCHEMA_VERSION 29
+#define CURRENT_SCHEMA_VERSION 31
 
 Tomahawk::DatabaseImpl::DatabaseImpl( const QString& dbname )
 {
     QTime t;
     t.start();
+
+    // Signals for splash screen must be connected here
+    connect( this, SIGNAL( schemaUpdateStarted() ),
+             qApp, SLOT( onSchemaUpdateStarted() ) );
+    connect( this, SIGNAL( schemaUpdateStatus( QString ) ),
+             qApp, SLOT( onSchemaUpdateStatus( QString ) ) );
+    connect( this, SIGNAL( schemaUpdateDone() ),
+             qApp, SLOT( onSchemaUpdateDone() ) );
 
     bool schemaUpdated = openDatabase( dbname );
     tDebug( LOGVERBOSE ) << "Opened database:" << t.elapsed();
@@ -221,6 +231,7 @@ Tomahawk::DatabaseImpl::updateSchema( int oldVersion )
     }
     else // update in place! run the proper upgrade script
     {
+        emit schemaUpdateStarted();
         int cur = oldVersion;
         m_db.transaction();
         while ( cur < CURRENT_SCHEMA_VERSION )
@@ -237,8 +248,9 @@ Tomahawk::DatabaseImpl::updateSchema( int oldVersion )
 
             QString sql = QString::fromUtf8( script.readAll() ).trimmed();
             QStringList statements = sql.split( ";", QString::SkipEmptyParts );
-            foreach ( const QString& sql, statements )
+            for ( int i = 0; i < statements.count(); ++i )
             {
+                QString sql = statements.at( i );
                 QString clean = cleanSql( sql ).trimmed();
                 if ( clean.isEmpty() )
                     continue;
@@ -246,10 +258,15 @@ Tomahawk::DatabaseImpl::updateSchema( int oldVersion )
                 tLog() << "Executing upgrade statement:" << clean;
                 TomahawkSqlQuery q = newquery();
                 q.exec( clean );
+
+                //Report to splash screen
+                emit schemaUpdateStatus( QString( "%1/%2" ).arg( QString::number( i + 1 ) )
+                                                           .arg( QString::number( statements.count() ) ) );
             }
         }
         m_db.commit();
         tLog() << "DB Upgrade successful!";
+        emit schemaUpdateDone();
         return true;
     }
 }
@@ -620,6 +637,15 @@ Tomahawk::DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
         Tomahawk::track_ptr track = Tomahawk::Track::get( origquery->queryTrack()->artist(), origquery->queryTrack()->track(), origquery->queryTrack()->album(), origquery->queryTrack()->duration() );
         res->setTrack( track );
 
+        ResultUrlChecker* checker = new ResultUrlChecker( origquery, QList< result_ptr >() << res );
+        QEventLoop loop;
+        connect( checker, SIGNAL( done() ), &loop, SLOT( quit() ) );
+        loop.exec();
+        checker->deleteLater();
+
+        if ( checker->validResults().isEmpty() )
+            res = result_ptr();
+
         return res;
     }
     else
@@ -659,7 +685,7 @@ Tomahawk::DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
     query.bindValue( 0, fileUrl );
     query.exec();
 
-    if( query.next() )
+    if ( query.next() )
     {
         QString url = query.value( 0 ).toString();
         Tomahawk::source_ptr s = SourceList::instance()->get( query.value( 15 ).toUInt() );

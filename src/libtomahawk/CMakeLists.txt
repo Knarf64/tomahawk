@@ -18,6 +18,8 @@ set( libGuiSources
     DropJob.cpp
     GlobalActionManager.cpp
     ViewPage.cpp
+    ViewPageLazyLoader.cpp
+    ViewPagePlugin.cpp
     ViewManager.cpp
     LatchManager.cpp
     TomahawkSettingsGui.cpp
@@ -72,6 +74,8 @@ set( libGuiSources
     playlist/TreeWidget.cpp
     playlist/ViewHeader.cpp
     playlist/LovedTracksModel.cpp
+    playlist/RecentlyLovedTracksModel.cpp
+    playlist/TopLovedTracksModel.cpp
     playlist/RecentlyAddedModel.cpp
     playlist/RecentlyPlayedModel.cpp
     playlist/SessionHistoryModel.cpp
@@ -102,6 +106,7 @@ set( libGuiSources
     resolvers/JSResolverHelper.cpp
     resolvers/ScriptEngine.cpp
 
+    utils/DpiScaler.cpp
     utils/ImageRegistry.cpp
     utils/WidgetDragFilter.cpp
     utils/XspfGenerator.cpp
@@ -155,6 +160,7 @@ set( libGuiSources
     widgets/RecentPlaylistsModel.cpp
     widgets/RecentlyPlayedPlaylistsModel.cpp
     widgets/ScriptCollectionHeader.cpp
+    widgets/ScrollingLabel.cpp
     widgets/SearchWidget.cpp
     widgets/SeekSlider.cpp
     widgets/SourceTreePopupDialog.cpp
@@ -188,7 +194,6 @@ list(APPEND libSources
     SourceList.cpp
     Pipeline.cpp
 
-    AclRegistry.cpp
     Artist.cpp
     ArtistPlaylistInterface.cpp
     Album.cpp
@@ -221,6 +226,8 @@ list(APPEND libSources
     accounts/AccountFactoryWrapper.cpp
     accounts/AccountFactoryWrapperDelegate.cpp
     accounts/AccountConfigWidget.cpp
+    accounts/ConfigStorage.cpp
+    accounts/LocalConfigStorage.cpp
 
     accounts/spotify/SpotifyAccount.cpp
     accounts/spotify/SpotifyAccountConfig.cpp
@@ -293,6 +300,7 @@ list(APPEND libSources
     database/DatabaseCommand_SourceOffline.cpp
     database/DatabaseCommand_TrackAttributes.cpp
     database/DatabaseCommand_TrackStats.cpp
+    database/DatabaseCommand_TrendingArtists.cpp
     database/DatabaseCommand_TrendingTracks.cpp
     database/DatabaseCommand_UpdateSearchIndex.cpp
     database/DatabaseCommandLoggable.cpp
@@ -314,6 +322,8 @@ list(APPEND libSources
     filemetadata/taghandlers/oggtag.cpp
     filemetadata/MetadataEditor.cpp
 
+    network/acl/AclRegistry.cpp
+    network/acl/AclRequest.cpp
     network/BufferIoDevice.cpp
     network/Msg.cpp
     network/MsgProcessor.cpp
@@ -329,6 +339,7 @@ list(APPEND libSources
 
     playlist/PlaylistUpdaterInterface.cpp
     playlist/PlaylistTemplate.cpp
+    playlist/XspfPlaylistTemplate.cpp
     playlist/dynamic/DynamicPlaylist.cpp
     playlist/dynamic/GeneratorFactory.cpp
     playlist/dynamic/GeneratorInterface.cpp
@@ -359,13 +370,16 @@ list(APPEND libSources
     utils/TomahawkCache.cpp
     utils/GuiHelpers.cpp
     utils/WeakObjectHash.cpp
-
+    utils/WeakObjectList.cpp
+    utils/PluginLoader.cpp
 
     thirdparty/kdsingleapplicationguard/kdsingleapplicationguard.cpp
     thirdparty/kdsingleapplicationguard/kdsharedmemorylocker.cpp
     thirdparty/kdsingleapplicationguard/kdtoolsglobal.cpp
     thirdparty/kdsingleapplicationguard/kdlockedsharedmemorypointer.cpp
 )
+
+add_subdirectory( accounts/configstorage )
 
 IF(LIBLASTFM_FOUND)
     include_directories( ${LIBLASTFM_INCLUDE_DIRS} )
@@ -388,7 +402,6 @@ set( libUI ${libUI}
     widgets/infowidgets/AlbumInfoWidget.ui
     widgets/infowidgets/TrackInfoWidget.ui
     playlist/QueueView.ui
-    playlist/ColumnViewPreviewWidget.ui
     filemetadata/MetadataEditor.ui
     context/ContextWidget.ui
     infobar/InfoBar.ui
@@ -420,7 +433,7 @@ ENDIF(QCA2_FOUND)
 IF(LIBATTICA_FOUND)
     SET( libGuiSources ${libGuiSources} AtticaManager.cpp )
     INCLUDE_DIRECTORIES( ${LIBATTICA_INCLUDE_DIR} )
-    LIST(APPEND LINK_LIBRARIES ${LIBATTICA_LIBRARIES} ${QuaZip_LIBRARIES} )
+    LIST(APPEND LINK_LIBRARIES ${LIBATTICA_LIBRARIES} ${LibAttica_LIBRARIES} ${QuaZip_LIBRARIES} )
 ENDIF(LIBATTICA_FOUND)
 
 IF( WIN32 )
@@ -449,10 +462,21 @@ IF( APPLE )
     SET( libSources ${libSources}
       utils/TomahawkUtils_Mac.mm
       mac/FileHelpers.mm
-      thirdparty/Qocoa/qbutton_mac.mm
-      thirdparty/Qocoa/qsearchfield_mac.mm
-      thirdparty/Qocoa/qtoolbartabdialog_mac.mm
       widgets/SourceTreePopupDialog_mac.mm )
+
+    if( BUILD_WITH_QT4 )
+        list(APPEND libSources
+            thirdparty/Qocoa/qbutton_mac.mm
+            thirdparty/Qocoa/qsearchfield_mac.mm
+            thirdparty/Qocoa/qtoolbartabdialog_mac.mm
+        )
+    else()
+        list(APPEND libSources
+            thirdparty/Qocoa/qbutton.cpp
+            thirdparty/Qocoa/qsearchfield.cpp
+            thirdparty/Qocoa/qtoolbartabdialog.cpp
+        )
+    endif()
 
     SET_SOURCE_FILES_PROPERTIES(utils/TomahawkUtils_Mac.mm PROPERTIES COMPILE_FLAGS "-fvisibility=default")
 
@@ -497,19 +521,22 @@ IF(QCA2_FOUND)
 ENDIF(QCA2_FOUND)
 
 IF( UNIX AND NOT APPLE )
-    LIST(APPEND LINK_LIBRARIES ${QT_QTDBUS_LIBRARY} )
+    LIST(APPEND LINK_LIBRARIES ${QT_QTDBUS_LIBRARIES} )
+    qt5_use_modules(tomahawklib DBus)
 ENDIF( UNIX AND NOT APPLE )
 
 TARGET_LINK_LIBRARIES( tomahawklib
     LINK_PRIVATE
+    ${PHONON_LIBRARY}
+
     # Thirdparty shipped with tomahawk
     ${LIBPORTFWD_LIBRARIES}
     ${QTKEYCHAIN_LIBRARIES}
 
+
     LINK_PUBLIC
     # External deps
     ${QJSON_LIBRARIES}
-    ${PHONON_LIBS}
     ${TAGLIB_LIBRARIES}
     ${CLUCENE_LIBRARIES}
     ${ECHONEST_LIBRARIES}

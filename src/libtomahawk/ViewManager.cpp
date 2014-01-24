@@ -1,6 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright 2010-2012, Leo Franchi   <lfranchi@kde.org>
  *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
@@ -145,7 +145,6 @@ ViewManager::createPageForPlaylist( const playlist_ptr& playlist )
     PlaylistView* pv = new PlaylistView();
     view->setDetailedView( pv );
     view->setPixmap( pv->pixmap() );
-    view->setEmptyTip( tr( "This playlist is empty!" ) );
 
     // We need to set the model on the view before loading the playlist, so spinners & co are connected
     view->setPlaylistModel( model );
@@ -167,7 +166,6 @@ ViewManager::createPageForList( const QString& title, const QList< query_ptr >& 
     PlaylistView* pv = new PlaylistView();
     view->setDetailedView( pv );
     view->setPixmap( pv->pixmap() );
-    view->setEmptyTip( tr( "This playlist is empty!" ) );
     view->setTemporaryPage( true );
 
     // We need to set the model on the view before loading the playlist, so spinners & co are connected
@@ -313,11 +311,11 @@ ViewManager::show( const Tomahawk::collection_ptr& collection )
 
         view->setTreeModel( model );
 
-        if ( !collection.isNull() )
-            view->setEmptyTip( collection->emptyText() );
-
         model->addCollection( collection );
         setPage( view );
+
+        if ( !collection.isNull() )
+            view->setEmptyTip( collection->emptyText() );
 
         m_collectionViews.insert( collection, view );
     }
@@ -325,6 +323,7 @@ ViewManager::show( const Tomahawk::collection_ptr& collection )
     {
         view = m_collectionViews.value( collection ).data();
     }
+    view->restoreViewMode();
 
     setPage( view );
     return view;
@@ -588,6 +587,17 @@ ViewManager::destroyPage( ViewPage* page )
 }
 
 
+bool
+ViewManager::destroyCurrentPage()
+{
+    if ( !currentPage() || !currentPage()->isTemporaryPage() )
+        return false;
+
+    destroyPage( currentPage() );
+    return true;
+}
+
+
 void
 ViewManager::setPage( ViewPage* page, bool trackHistory )
 {
@@ -651,7 +661,7 @@ ViewManager::setPage( ViewPage* page, bool trackHistory )
     m_stack->setCurrentWidget( page->widget() );
 
     //This should save the CPU cycles, especially with pages like the visualizer
-    if(previousPage && previousPage != page->widget())
+    if ( previousPage && previousPage != page->widget() )
         previousPage->hide();
 
     updateView();
@@ -870,45 +880,66 @@ ViewManager::inboxWidget() const
 ViewPage*
 ViewManager::dynamicPageWidget( const QString& pageName ) const
 {
-    if( m_dynamicPages.contains( pageName ) )
+    if ( m_dynamicPages.contains( pageName ) )
         return m_dynamicPages.value( pageName );
+
+    if ( m_dynamicPagePlugins.contains( pageName ) )
+        return m_dynamicPagePlugins.value( pageName ).data();
 
     return 0;
 }
 
 
 void
-ViewManager::addDynamicPage( const QString& pageName, const QString& text, const QIcon& icon, boost::function<Tomahawk::ViewPage*()> instanceLoader )
+ViewManager::addDynamicPage( Tomahawk::ViewPagePlugin* viewPage, const QString& pageName )
 {
-    tLog() << Q_FUNC_INFO << "Trying to add " << pageName;
+    const QString pageId = !pageName.isEmpty() ? pageName : viewPage->defaultName();
 
-    if( m_dynamicPages.contains( pageName ) )
+    tLog() << Q_FUNC_INFO << "Trying to add" << pageId;
+
+    if ( m_dynamicPages.contains( pageId ) || m_dynamicPagePlugins.contains( pageId ) )
     {
-        tLog() << "Not adding a second ViewPage with name " << pageName;
+        tLog() << "Not adding a second ViewPage with name" << pageName;
+        Q_ASSERT( false );
+    }
+
+    m_dynamicPagePlugins.insert( pageId, viewPage );
+    emit viewPageAdded( pageId, viewPage, viewPage->sortValue() );
+}
+
+
+/*void
+ViewManager::addDynamicPage( const QString& pageName, const QString& text, const QIcon& icon, boost::function<Tomahawk::ViewPage*()> instanceLoader, int sortValue )
+{
+    tLog() << Q_FUNC_INFO << "Trying to add" << pageName;
+
+    if ( m_dynamicPages.contains( pageName ) || m_dynamicPagePlugins.contains( pageName ) )
+    {
+        tLog() << "Not adding a second ViewPage with name" << pageName;
         Q_ASSERT( false );
     }
 
     m_dynamicPagesInstanceLoaders.insert( pageName, instanceLoader );
-    emit viewPageAdded( pageName, text, icon );
-}
+    emit viewPageAdded( pageName, text, icon, sortValue );
+}*/
 
 
 ViewPage*
 ViewManager::showDynamicPage( const QString& pageName )
 {
-    tLog() << Q_FUNC_INFO << "pageName: " << pageName;
+    tLog() << Q_FUNC_INFO << "pageName:" << pageName;
 
-    if( !m_dynamicPages.contains( pageName ) )
+    if ( !m_dynamicPages.contains( pageName ) && !m_dynamicPagePlugins.contains( pageName ) )
     {
-        if( !m_dynamicPagesInstanceLoaders.contains( pageName ) )
+        if ( !m_dynamicPagesInstanceLoaders.contains( pageName ) )
         {
            tLog() << "Trying to show a page that does not exist and does not have a registered loader";
-           Q_ASSERT(false);
+           Q_ASSERT( false );
            return 0;
         }
 
         ViewPage* viewPage = m_dynamicPagesInstanceLoaders.value( pageName )();
-        Q_ASSERT(viewPage);
+        Q_ASSERT( viewPage );
         m_dynamicPages.insert( pageName, viewPage );
 
         m_dynamicPagesInstanceLoaders.remove( pageName );
@@ -923,6 +954,7 @@ ViewManager::superCollectionView() const
 {
     return m_superCollectionView;
 }
+
 
 InboxModel*
 ViewManager::inboxModel()

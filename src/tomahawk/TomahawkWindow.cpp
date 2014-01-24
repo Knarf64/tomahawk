@@ -1,6 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
@@ -51,7 +51,6 @@
 #include "widgets/AnimatedSplitter.h"
 #include "widgets/NewPlaylistWidget.h"
 #include "widgets/SearchWidget.h"
-#include "widgets/PlaylistTypeSelectorDialog.h"
 #include "widgets/ContainedMenuButton.h"
 #include "thirdparty/Qocoa/qsearchfield.h"
 #include "playlist/dynamic/GeneratorInterface.h"
@@ -71,13 +70,13 @@
 #include "ViewManager.h"
 #include "ActionCollection.h"
 #include "AudioControls.h"
-#include "SettingsDialog.h"
-#include "DiagnosticsDialog.h"
+#include "dialogs/SettingsDialog.h"
+#include "dialogs/DiagnosticsDialog.h"
 #include "TomahawkSettings.h"
 #include "SourceList.h"
 #include "TomahawkTrayIcon.h"
 #include "TomahawkApp.h"
-#include "LoadXSPFDialog.h"
+#include "dialogs/LoadXSPFDialog.h"
 #include "utils/ImageRegistry.h"
 #include "utils/Logger.h"
 
@@ -102,16 +101,14 @@ using namespace Accounts;
 
 TomahawkWindow::TomahawkWindow( QWidget* parent )
     : QMainWindow( parent )
+    , TomahawkUtils::DpiScaler( this )
 #ifdef Q_OS_WIN
     , m_buttonCreatedID( RegisterWindowMessage( L"TaskbarButtonCreated" ) )
-  #ifdef HAVE_THUMBBUTTON
     , m_taskbarList( 0 )
-  #endif
 #endif
     , ui( new Ui::TomahawkWindow )
     , m_searchWidget( 0 )
     , m_trayIcon( new TomahawkTrayIcon( this ) )
-    , m_settingsDialog( 0 )
     , m_audioRetryCounter( 0 )
 {
     TomahawkStyle::loadFonts();
@@ -136,11 +133,12 @@ TomahawkWindow::TomahawkWindow( QWidget* parent )
     setupMenuBar();
     setupToolBar();
     setupSideBar();
-    statusBar()->addPermanentWidget( m_audioControls, 1 );
+    setupStatusBar();
 
     setupUpdateCheck();
     loadSettings();
     setupSignals();
+    setupShortcuts();
 
     if ( qApp->arguments().contains( "--debug" ) )
     {
@@ -215,6 +213,8 @@ TomahawkWindow::loadSettings()
     m_compactMenuAction->setVisible( !mbVisible );
     ActionCollection::instance()->getAction( "toggleMenuBar" )->setText( mbVisible ? tr( "Hide Menu Bar" ) : tr( "Show Menu Bar" ) );
 #endif
+
+    ActionCollection::instance()->getAction( "showOfflineSources" )->setChecked( TomahawkSettings::instance()->showOfflineSources() );
 }
 
 
@@ -256,6 +256,7 @@ TomahawkWindow::applyPlatformTweaks()
 #endif
 }
 
+
 void
 TomahawkWindow::setupToolBar()
 {
@@ -263,7 +264,11 @@ TomahawkWindow::setupToolBar()
     m_toolbar->setObjectName( "TomahawkToolbar" );
     m_toolbar->setMovable( false );
     m_toolbar->setFloatable( false );
+#ifdef Q_OS_MAC
     m_toolbar->setIconSize( QSize( 22, 22 ) );
+#else
+    m_toolbar->setIconSize( scaled( 22, 22 ) );
+#endif
     m_toolbar->setToolButtonStyle( Qt::ToolButtonIconOnly );
     m_toolbar->setStyleSheet( "border-bottom: 0px" );
     // If the toolbar is hidden accidentally it causes trouble on Unity because the user can't
@@ -275,10 +280,26 @@ TomahawkWindow::setupToolBar()
     m_toolbar->installEventFilter( new WidgetDragFilter( m_toolbar ) );
 #endif
 
-    m_backAction = m_toolbar->addAction( ImageRegistry::instance()->icon( RESPATH "images/back.svg" ), tr( "Back" ), ViewManager::instance(), SLOT( historyBack() ) );
+    m_backAction = m_toolbar->addAction( ImageRegistry::instance()->pixmap( RESPATH "images/back.svg", m_toolbar->iconSize() ),
+                                         tr( "Back" ),
+                                         ViewManager::instance(),
+                                         SLOT( historyBack() ) );
     m_backAction->setToolTip( tr( "Go back one page" ) );
-    m_forwardAction = m_toolbar->addAction( ImageRegistry::instance()->icon( RESPATH "images/forward.svg" ), tr( "Forward" ), ViewManager::instance(), SLOT( historyForward() ) );
+#ifdef Q_OS_MAC
+    m_backAction->setShortcut( QKeySequence( "Ctrl+Left" ) );
+#else
+    m_backAction->setShortcut( QKeySequence( "Alt+Left" ) );
+#endif
+    m_forwardAction = m_toolbar->addAction( ImageRegistry::instance()->pixmap( RESPATH "images/forward.svg", m_toolbar->iconSize() ),
+                                            tr( "Forward" ),
+                                            ViewManager::instance(),
+                                            SLOT( historyForward() ) );
     m_forwardAction->setToolTip( tr( "Go forward one page" ) );
+#ifdef Q_OS_MAC
+    m_forwardAction->setShortcut( QKeySequence( "Ctrl+Right" ) );
+#else
+    m_forwardAction->setShortcut( QKeySequence( "Alt+Right" ) );
+#endif
 
     m_toolbarLeftBalancer = new QWidget( this );
     m_toolbarLeftBalancer->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Preferred );
@@ -292,11 +313,8 @@ TomahawkWindow::setupToolBar()
     m_searchWidget = new QSearchField( this );
     m_searchWidget->setPlaceholderText( tr( "Search for any artist, album or song..." ) );
     m_searchWidget->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Preferred );
-    m_searchWidget->setFixedWidth( 340 );
-    connect( m_searchWidget, SIGNAL( returnPressed() ), this, SLOT( onFilterEdited() ) );
-    // Use Ctrl+F to focus the searchWidget
-    QShortcut *shortcut = new QShortcut( QKeySequence( QKeySequence::Find ), this );
-    QObject::connect( shortcut, SIGNAL( activated() ), m_searchWidget, SLOT( setFocus() ) );
+    m_searchWidget->setFixedWidth( scaledX( 340 ) );
+    connect( m_searchWidget, SIGNAL( returnPressed() ), SLOT( onFilterEdited() ) );
 
     m_toolbar->addWidget( m_searchWidget )->setProperty( "kind", QString( "search" ) );
 
@@ -311,12 +329,11 @@ TomahawkWindow::setupToolBar()
 
     m_accountsButton = new AccountsToolButton( m_toolbar );
     m_toolbar->addWidget( m_accountsButton );
-    connect( m_accountsButton, SIGNAL( widthChanged() ),
-             this, SLOT( balanceToolbar() ) );
+    connect( m_accountsButton, SIGNAL( widthChanged() ), SLOT( balanceToolbar() ) );
 
 #ifndef Q_OS_MAC
     ContainedMenuButton* compactMenuButton = new ContainedMenuButton( m_toolbar );
-    compactMenuButton->setIcon( ImageRegistry::instance()->icon( RESPATH "images/configure.svg" ) );
+    compactMenuButton->setIcon( ImageRegistry::instance()->pixmap( RESPATH "images/configure.svg", m_toolbar->iconSize() ) );
     compactMenuButton->setText( tr( "&Main Menu" ) );
     compactMenuButton->setMenu( m_compactMainMenu );
     compactMenuButton->setToolButtonStyle( Qt::ToolButtonIconOnly );
@@ -329,6 +346,7 @@ TomahawkWindow::setupToolBar()
     addAction( ActionCollection::instance()->getAction( "toggleMenuBar" ) );
     addAction( ActionCollection::instance()->getAction( "quit" ) );
 #endif
+
     balanceToolbar();
 }
 
@@ -341,9 +359,10 @@ TomahawkWindow::balanceToolbar()
     bool flip = false;
     foreach ( QAction* action, m_toolbar->actions() )
     {
-        if ( action->property( "kind" ) == QString( "spacer" ) ||
-            !action->isVisible() )
+        if ( action->property( "kind" ) == QString( "spacer" ) || !action->isVisible() )
+        {
             continue;
+        }
         else if ( action->property( "kind" ) == QString( "search" ) )
         {
             flip = true;
@@ -423,9 +442,39 @@ TomahawkWindow::setupSideBar()
     ui->splitter->addWidget( ViewManager::instance()->widget() );
     ui->splitter->setCollapsible( 0, false );
     ui->splitter->setCollapsible( 1, false );
+}
 
-    ActionCollection::instance()->getAction( "showOfflineSources" )
-            ->setChecked( TomahawkSettings::instance()->showOfflineSources() );
+
+void
+TomahawkWindow::setupStatusBar()
+{
+    statusBar()->addPermanentWidget( m_audioControls, 1 );
+}
+
+
+void
+TomahawkWindow::setupShortcuts()
+{
+    {
+        // Use Ctrl+F to focus the searchWidget
+        QShortcut* shortcut = new QShortcut( QKeySequence( QKeySequence::Find ), this );
+        QObject::connect( shortcut, SIGNAL( activated() ), m_searchWidget, SLOT( setFocus() ) );
+    }
+    {
+        // Use Ctrl+W to close current page
+        QShortcut* shortcut = new QShortcut( QKeySequence( QKeySequence::Close ), this );
+        QObject::connect( shortcut, SIGNAL( activated() ), ViewManager::instance(), SLOT( destroyCurrentPage() ) );
+    }
+    {
+        // Ctrl Up for raising the volume
+        QShortcut* shortcut = new QShortcut( QKeySequence( QKeySequence( "Ctrl+Up" ) ), this );
+        QObject::connect( shortcut, SIGNAL( activated() ), AudioEngine::instance(), SLOT( raiseVolume() ) );
+    }
+    {
+        // Ctrl Down for lowering the volume
+        QShortcut* shortcut = new QShortcut( QKeySequence( QKeySequence( "Ctrl+Down" ) ), this );
+        QObject::connect( shortcut, SIGNAL( activated() ), AudioEngine::instance(), SLOT( lowerVolume() ) );
+    }
 }
 
 
@@ -458,7 +507,6 @@ TomahawkWindow::setupUpdateCheck()
 bool
 TomahawkWindow::setupWindowsButtons()
 {
-#ifdef HAVE_THUMBBUTTON
     const GUID IID_ITaskbarList3 = { 0xea1afb91,0x9e28,0x4b86, { 0x90,0xe9,0x9e,0x9f,0x8a,0x5e,0xef,0xaf } };
     HRESULT hr = S_OK;
 
@@ -508,17 +556,14 @@ TomahawkWindow::setupWindowsButtons()
     }
 
     return SUCCEEDED( hr );
-#else // HAVE_THUMBBUTTON
-    return false;
-#endif
 }
 
 
 HICON
-TomahawkWindow::thumbIcon(TomahawkUtils::ImageType type)
+TomahawkWindow::thumbIcon( TomahawkUtils::ImageType type )
 {
     static QMap<TomahawkUtils::ImageType,HICON> thumbIcons;
-    if (!thumbIcons.contains( type ) )
+    if ( !thumbIcons.contains( type ) )
     {
         QPixmap pix ( TomahawkUtils::defaultPixmap(type , TomahawkUtils::Original, QSize( 20, 20 ) ) );
         thumbIcons[type] = pix.toWinHICON();
@@ -730,14 +775,12 @@ TomahawkWindow::winEvent( MSG* msg, long* result )
 
     return false;
 }
-#endif // Q_OS_WIN
 
 
 void
 TomahawkWindow::audioStateChanged( AudioState newState, AudioState oldState )
 {
     Q_UNUSED(oldState);
-#ifdef HAVE_THUMBBUTTON
     if ( m_taskbarList == 0 )
         return;
     switch ( newState )
@@ -778,17 +821,12 @@ TomahawkWindow::audioStateChanged( AudioState newState, AudioState oldState )
     }
 
     m_taskbarList->ThumbBarUpdateButtons( winId(), ARRAYSIZE( m_thumbButtons ), m_thumbButtons );
-#else
-    Q_UNUSED( newState );
-    Q_UNUSED( oldState );
-#endif // HAVE_THUMBBUTTON
 }
 
 
 void
 TomahawkWindow::updateWindowsLoveButton()
 {
-#ifdef HAVE_THUMBBUTTON
     if ( m_taskbarList == 0 )
         return;
     if ( !AudioEngine::instance()->currentTrack().isNull() && AudioEngine::instance()->currentTrack()->track()->loved() )
@@ -804,8 +842,8 @@ TomahawkWindow::updateWindowsLoveButton()
 
     m_thumbButtons[TP_LOVE].dwFlags = THBF_ENABLED;
     m_taskbarList->ThumbBarUpdateButtons( winId(), ARRAYSIZE( m_thumbButtons ), m_thumbButtons );
-#endif // HAVE_THUMBBUTTON
 }
+#endif // Q_OS_WIN
 
 
 void
@@ -825,10 +863,10 @@ TomahawkWindow::onHistoryForwardAvailable( bool avail )
 void
 TomahawkWindow::showSettingsDialog()
 {
-    if ( !m_settingsDialog )
-        m_settingsDialog = new SettingsDialog;
+    SettingsDialog* settingsDialog = new SettingsDialog;
+    connect( settingsDialog, SIGNAL( finished( bool ) ), settingsDialog, SLOT( deleteLater() ) );
 
-    m_settingsDialog->show();
+    settingsDialog->show();
 }
 
 
@@ -890,6 +928,12 @@ TomahawkWindow::fullScreenEntered()
     TomahawkSettings::instance()->setFullscreenEnabled( true );
     statusBar()->setSizeGripEnabled( false );
 
+    // Since we just disabled the size-grip the entire statusbar will shift a bit to the right
+    // The volume bar would now have no margin to the right screen edge. Prevent that.
+    QMargins margins = statusBar()->contentsMargins();
+    margins.setRight( 24 );
+    statusBar()->setContentsMargins( margins );
+
 #if defined( Q_WS_MAC )
     ActionCollection::instance()->getAction( "fullscreen" )->setText( tr( "Exit Full Screen" ) );
 #endif
@@ -901,6 +945,12 @@ TomahawkWindow::fullScreenExited()
 {
     TomahawkSettings::instance()->setFullscreenEnabled( false );
     statusBar()->setSizeGripEnabled( true );
+
+    // Since we just enabled the size-grip the entire statusbar will shift a bit to the left
+    // The volume bar would now have too big a margin to the right screen edge. Prevent that.
+    QMargins margins = statusBar()->contentsMargins();
+    margins.setRight( 0 );
+    statusBar()->setContentsMargins( margins );
 
 #if defined( Q_WS_MAC )
     ActionCollection::instance()->getAction( "fullscreen" )->setText( tr( "Enter Full Screen" ) );
@@ -982,7 +1032,7 @@ void
 TomahawkWindow::onAudioEngineError( AudioEngine::AudioErrorCode /* error */ )
 {
     QString msg;
-    #ifdef Q_WS_X11
+    #ifdef Q_OS_LINUX
         msg = tr( "Sorry, there is a problem accessing your audio device or the desired track, current track will be skipped. Make sure you have a suitable Phonon backend and required plugins installed." );
     #else
         msg = tr( "Sorry, there is a problem accessing your audio device or the desired track, current track will be skipped." );
@@ -997,25 +1047,6 @@ TomahawkWindow::onAudioEngineError( AudioEngine::AudioErrorCode /* error */ )
     if ( m_audioRetryCounter < 3 )
         AudioEngine::instance()->play();
     m_audioRetryCounter++;
-}
-
-
-void
-TomahawkWindow::createAutomaticPlaylist( QString playlistName )
-{
-    if ( playlistName.isEmpty() )
-        return;
-
-    source_ptr author = SourceList::instance()->getLocal();
-    QString id = uuid();
-    QString info  = ""; // FIXME
-    QString creator = "someone"; // FIXME
-
-    dynplaylist_ptr playlist = DynamicPlaylist::create( author, id, playlistName, info, creator, Static, false );
-    playlist->setMode( Static );
-    playlist->createNewRevision( uuid(), playlist->currentrevision(), playlist->type(), playlist->generator()->controls(), playlist->entries() );
-
-    ViewManager::instance()->show( playlist );
 }
 
 
@@ -1043,12 +1074,10 @@ TomahawkWindow::createStation()
         }
     }
 
-    source_ptr author = SourceList::instance()->getLocal();
-    QString id = uuid();
     QString info  = ""; // FIXME
-    QString creator = "someone"; // FIXME
+    QString creator = ""; // FIXME
 
-    dynplaylist_ptr playlist = DynamicPlaylist::create( author, id, playlistName, info, creator, OnDemand, false );
+    dynplaylist_ptr playlist = DynamicPlaylist::create( SourceList::instance()->getLocal(), uuid(), playlistName, info, creator, OnDemand, false );
     playlist->setMode( OnDemand );
     playlist->createNewRevision( uuid(), playlist->currentrevision(), playlist->type(), playlist->generator()->controls() );
 
@@ -1059,69 +1088,32 @@ TomahawkWindow::createStation()
 void
 TomahawkWindow::createPlaylist()
 {
-    PlaylistTypeSelectorDlg* playlistSelectorDlg = new PlaylistTypeSelectorDlg( TomahawkApp::instance()->mainWindow(), Qt::Sheet );
+    QString title = tr( "Playlist" );
+    bool ok;
+    QString playlistName = QInputDialog( this, Qt::Sheet ).getText( this, tr( "Create New Playlist" ), tr( "Name:" ), QLineEdit::Normal, title, &ok );
+    if ( !ok )
+        return;
 
-#ifndef Q_OS_MAC
-    playlistSelectorDlg->setModal( true );
-#endif
-
-    connect( playlistSelectorDlg, SIGNAL( finished( int ) ), SLOT( playlistCreateDialogFinished( int ) ) );
-    playlistSelectorDlg->show();
-}
-
-
-void
-TomahawkWindow::playlistCreateDialogFinished( int ret )
-{
-    PlaylistTypeSelectorDlg* playlistSelectorDlg = qobject_cast< PlaylistTypeSelectorDlg* >( sender() );
-    Q_ASSERT( playlistSelectorDlg );
-
-    QString playlistName = playlistSelectorDlg->playlistName();
-
-    if ( !playlistSelectorDlg->playlistTypeIsAuto() && ret )
+    if ( playlistName.isEmpty() || playlistName == title )
     {
-        if ( playlistName.isEmpty() )
+        QList< playlist_ptr > pls = SourceList::instance()->getLocal()->dbCollection()->playlists();
+        QStringList titles;
+        foreach ( const playlist_ptr& pl, pls )
+            titles << pl->title();
+
+        playlistName = title;
+        int i = 2;
+        while ( titles.contains( playlistName ) )
         {
-            QList< playlist_ptr > pls = SourceList::instance()->getLocal()->dbCollection()->playlists();
-            QStringList titles;
-            foreach ( const playlist_ptr& pl, pls )
-                titles << pl->title();
-
-            QString title = tr( "Playlist" );
-            playlistName = title;
-            int i = 2;
-            while ( titles.contains( playlistName ) )
-            {
-                playlistName = QString( "%1 (%2)" ).arg( title ).arg( i++ );
-            }
+            playlistName = QString( "%1 (%2)" ).arg( title ).arg( i++ );
         }
-
-        playlist_ptr playlist = Tomahawk::Playlist::create( SourceList::instance()->getLocal(), uuid(), playlistName, "", "", false, QList< query_ptr>() );
-        ViewManager::instance()->show( playlist );
-    }
-    else if ( playlistSelectorDlg->playlistTypeIsAuto() && ret )
-    {
-       // create Auto Playlist
-        if ( playlistName.isEmpty() )
-        {
-            QList< dynplaylist_ptr > pls = SourceList::instance()->getLocal()->dbCollection()->autoPlaylists();
-            QStringList titles;
-            foreach ( const dynplaylist_ptr& pl, pls )
-                titles << pl->title();
-
-            QString title = tr( "Automatic Playlist" );
-            playlistName = title;
-            int i = 2;
-            while ( titles.contains( playlistName ) )
-            {
-                playlistName = QString( "%1 (%2)" ).arg( title ).arg( i++ );
-            }
-        }
-
-       createAutomaticPlaylist( playlistName );
     }
 
-    playlistSelectorDlg->deleteLater();
+    QString info  = ""; // FIXME
+    QString creator = "someone"; // FIXME
+
+    playlist_ptr playlist = Tomahawk::Playlist::create( SourceList::instance()->getLocal(), uuid(), playlistName, info, creator, false, QList< query_ptr>() );
+    ViewManager::instance()->show( playlist );
 }
 
 

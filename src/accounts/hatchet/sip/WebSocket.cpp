@@ -105,7 +105,7 @@ WebSocket::disconnectWs( websocketpp::close::status::value status, const QString
     error_code ec;
     if ( m_connection )
     {
-        m_connection->close( status, reason.toAscii().constData(), ec );
+        m_connection->close( status, reason.toLatin1().constData(), ec );
         QMetaObject::invokeMethod( this, "readOutput", Qt::QueuedConnection );
         QTimer::singleShot( 5000, this, SLOT( disconnectSocket() ) ); //safety
         return;
@@ -211,16 +211,13 @@ WebSocket::readOutput()
     if ( !m_connection )
         return;
 
-    tDebug() << Q_FUNC_INFO;
-
     std::string outputString = m_outputStream.str();
     if ( outputString.size() > 0 )
     {
         m_outputStream.str("");
 
-        tDebug() << Q_FUNC_INFO << "Got string of size" << outputString.size() << "from ostream";
         qint64 sizeWritten = m_socket->write( outputString.data(), outputString.size() );
-        tDebug() << Q_FUNC_INFO << "Wrote" << sizeWritten << "bytes to the socket";
+        tDebug() << Q_FUNC_INFO << "Got " << outputString.size() << "from outstream, wrote" << sizeWritten << "bytes to the socket";
         if ( sizeWritten == -1 )
         {
             tLog() << Q_FUNC_INFO << "Error during writing, closing connection";
@@ -253,8 +250,6 @@ WebSocket::readOutput()
 void
 WebSocket::socketReadyRead()
 {
-    tDebug() << Q_FUNC_INFO;
-
     if ( !m_socket || !m_socket->isEncrypted() )
         return;
 
@@ -267,11 +262,10 @@ WebSocket::socketReadyRead()
 
     if ( qint64 bytes = m_socket->bytesAvailable() )
     {
-        tDebug() << Q_FUNC_INFO << "Bytes available:" << bytes;
         QByteArray buf;
         buf.resize( bytes );
         qint64 bytesRead = m_socket->read( buf.data(), bytes );
-        tDebug() << Q_FUNC_INFO << "Bytes read:" << bytesRead; // << ", content is" << websocketpp::utility::to_hex( buf.constData(), bytesRead ).data();
+        tDebug() << Q_FUNC_INFO << "Bytes available: " << bytes << ", bytes read:" << bytesRead; // << ", content is" << websocketpp::utility::to_hex( buf.constData(), bytesRead ).data();
         if ( bytesRead != bytes )
         {
             tLog() << Q_FUNC_INFO << "Error occurred during socket read. Something is wrong; disconnecting";
@@ -289,7 +283,6 @@ WebSocket::socketReadyRead()
 void
 WebSocket::encodeMessage( const QByteArray &bytes )
 {
-    tDebug() << Q_FUNC_INFO << "Encoding message"; //, message is" << bytes.constData();
     if ( !m_connection )
     {
         tLog() << Q_FUNC_INFO << "Asked to send message but do not have a valid connection!";

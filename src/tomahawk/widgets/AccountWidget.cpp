@@ -27,6 +27,7 @@
 #include "utils/TomahawkStyle.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/AnimatedSpinner.h"
+#include "utils/Logger.h"
 #include "widgets/ElidedLabel.h"
 
 #include "jobview/JobStatusView.h"
@@ -45,15 +46,16 @@
 
 AccountWidget::AccountWidget( QWidget* parent )
     : QWidget( parent )
+    , TomahawkUtils::DpiScaler( this )
 {
     QHBoxLayout *mainLayout = new QHBoxLayout( this );
     TomahawkUtils::unmarginLayout( mainLayout );
     setLayout( mainLayout );
-    setContentsMargins( 0, 8, 0, 8 );
+    setContentsMargins( 0, scaledY( 8 ), 0, scaledY( 8 ) );
 
     m_imageLabel = new QLabel( this );
     mainLayout->addWidget( m_imageLabel );
-    mainLayout->setSpacing( 4 );
+    mainLayout->setSpacing( scaledX( 4 ) );
 
     QGridLayout* vLayout = new QGridLayout( this );
     vLayout->setSpacing( 8 );
@@ -133,13 +135,13 @@ AccountWidget::AccountWidget( QWidget* parent )
     vLayout->addWidget( m_inviteButton, 1, 1 );
     vLayout->setColumnStretch( 0, 1 );
 
-
 #ifdef Q_OS_MAC
     layout()->setContentsMargins( 0, 0, 0, 0 );
 #endif
 
     setInviteWidgetsEnabled( false );
 }
+
 
 AccountWidget::~AccountWidget()
 {
@@ -153,10 +155,11 @@ AccountWidget::update( const QPersistentModelIndex& idx, int accountIdx )
     Tomahawk::Accounts::Account* account =
             idx.data( Tomahawk::Accounts::AccountModel::ChildrenOfFactoryRole )
             .value< QList< Tomahawk::Accounts::Account* > >().at( accountIdx );
+
     if ( account )
     {
         const QPixmap& pixmap = account->icon();
-        QSize pixmapSize( 32, 32 );
+        QSize pixmapSize( scaled( 32, 32 ) );
         m_imageLabel->setPixmap( pixmap.scaled( pixmapSize, Qt::KeepAspectRatio, Qt::SmoothTransformation ) );
         m_imageLabel->setFixedSize( pixmapSize );
 
@@ -180,41 +183,52 @@ AccountWidget::update( const QPersistentModelIndex& idx, int accountIdx )
 
         switch ( account->connectionState() )
         {
-        case Tomahawk::Accounts::Account::Connected:
-            if ( account->enabled() )
-                m_statusToggle->setChecked( true );
-            else
-                qDebug() << "AccountWidget warning:" << account->accountFriendlyName()
-                         << "is Connected but Disabled!";
-            m_spinner->fadeOut();
-            m_statusToggle->setBackChecked( true );
-            setInviteWidgetsEnabled( true );
-            break;
-        case Tomahawk::Accounts::Account::Connecting:
-            if ( !account->enabled() )
-                qDebug() << "AccountWidget warning:" << account->accountFriendlyName()
-                         << "is Connecting but Disabled!";
-            m_spinner->fadeIn();
-            m_statusToggle->setBackChecked( false );
-            setInviteWidgetsEnabled( false );
-            break;
-        case Tomahawk::Accounts::Account::Disconnected:
-            if ( !account->enabled() )
-                m_statusToggle->setChecked( false );
-            else
-                qDebug() << "AccountWidget warning:" << account->accountFriendlyName()
-                         << "is Disconnected but Enabled!";
-            m_spinner->fadeOut();
-            m_statusToggle->setBackChecked( false );
-            setInviteWidgetsEnabled( false );
-            break;
-        case Tomahawk::Accounts::Account::Disconnecting:
-            if ( account->enabled() )
-                qDebug() << "AccountWidget warning:" << account->accountFriendlyName()
-                         << "is Disconnecting but Enabled!";
-            m_spinner->fadeIn();
-            m_statusToggle->setBackChecked( true );
-            setInviteWidgetsEnabled( false );
+            case Tomahawk::Accounts::Account::Connected:
+            {
+                if ( account->enabled() )
+                    m_statusToggle->setChecked( true );
+                else
+                    tDebug() << "AccountWidget warning:" << account->accountFriendlyName()
+                             << "is Connected but Disabled!";
+                m_spinner->fadeOut();
+                m_statusToggle->setBackChecked( true );
+                setInviteWidgetsEnabled( true );
+                break;
+            }
+
+            case Tomahawk::Accounts::Account::Connecting:
+            {
+                if ( !account->enabled() )
+                    tDebug() << "AccountWidget warning:" << account->accountFriendlyName()
+                             << "is Connecting but Disabled!";
+                m_spinner->fadeIn();
+                m_statusToggle->setBackChecked( false );
+                setInviteWidgetsEnabled( false );
+                break;
+            }
+
+            case Tomahawk::Accounts::Account::Disconnected:
+            {
+                if ( !account->enabled() )
+                    m_statusToggle->setChecked( false );
+                else
+                    tDebug() << "AccountWidget warning:" << account->accountFriendlyName()
+                             << "is Disconnected but Enabled!";
+                m_spinner->fadeOut();
+                m_statusToggle->setBackChecked( false );
+                setInviteWidgetsEnabled( false );
+                break;
+            }
+
+            case Tomahawk::Accounts::Account::Disconnecting:
+            {
+                if ( account->enabled() )
+                    tDebug() << "AccountWidget warning:" << account->accountFriendlyName()
+                             << "is Disconnecting but Enabled!";
+                m_spinner->fadeIn();
+                m_statusToggle->setBackChecked( true );
+                setInviteWidgetsEnabled( false );
+            }
         }
 
         if ( !account->enabled() && account->connectionState() == Tomahawk::Accounts::Account::Disconnected )
@@ -234,12 +248,14 @@ AccountWidget::update( const QPersistentModelIndex& idx, int accountIdx )
     }
 }
 
+
 void
 AccountWidget::changeAccountConnectionState( bool connected )
 {
     Tomahawk::Accounts::Account* account =
             m_myFactoryIdx.data( Tomahawk::Accounts::AccountModel::ChildrenOfFactoryRole )
             .value< QList< Tomahawk::Accounts::Account* > >().at( m_myAccountIdx );
+
     if ( account )
     {
         if ( connected )
@@ -253,16 +269,19 @@ AccountWidget::changeAccountConnectionState( bool connected )
     }
 }
 
+
 void
 AccountWidget::sendInvite()
 {
     Tomahawk::Accounts::Account* account =
             m_myFactoryIdx.data( Tomahawk::Accounts::AccountModel::ChildrenOfFactoryRole )
             .value< QList< Tomahawk::Accounts::Account* > >().at( m_myAccountIdx );
+
     if ( account )
     {
         if ( !m_inviteEdit->text().isEmpty() )
-            account->sipPlugin()->addContact( m_inviteEdit->text() );
+            account->sipPlugin()->addContact( m_inviteEdit->text(), SipPlugin::SendInvite );
+
         m_inviteButton->setEnabled( false );
         m_inviteEdit->setEnabled( false );
         QTimer::singleShot( 500, this, SLOT( clearInviteWidgets() ) );
@@ -275,6 +294,7 @@ AccountWidget::onInviteSentSuccess( const QString& inviteId )
 {
     JobStatusView::instance()->model()->addJob( new SipStatusMessage( SipStatusMessage::SipInviteSuccess, inviteId ) );
 }
+
 
 void
 AccountWidget::onInviteSentFailure( const QString& inviteId )
@@ -290,12 +310,14 @@ AccountWidget::clearInviteWidgets()
     m_inviteEdit->clear();
 }
 
+
 void
 AccountWidget::setInviteWidgetsEnabled( bool enabled )
 {
     m_inviteButton->setEnabled( enabled );
     m_inviteEdit->setEnabled( enabled );
 }
+
 
 void
 AccountWidget::setupConnections( const QPersistentModelIndex& idx, int accountIdx )
@@ -306,14 +328,12 @@ AccountWidget::setupConnections( const QPersistentModelIndex& idx, int accountId
     Tomahawk::Accounts::Account* account =
             idx.data( Tomahawk::Accounts::AccountModel::ChildrenOfFactoryRole )
             .value< QList< Tomahawk::Accounts::Account* > >().at( accountIdx );
+
     if ( account )
     {
-        connect( m_statusToggle, SIGNAL( toggled( bool ) ),
-                 this, SLOT( changeAccountConnectionState( bool ) ) );
-        connect( m_inviteButton, SIGNAL( clicked() ),
-                 this, SLOT( sendInvite() ) );
-        connect( m_inviteEdit, SIGNAL( returnPressed() ),
-                 this, SLOT( sendInvite() ) );
+        connect( m_statusToggle, SIGNAL( toggled( bool ) ), SLOT( changeAccountConnectionState( bool ) ) );
+        connect( m_inviteButton, SIGNAL( clicked() ), SLOT( sendInvite() ) );
+        connect( m_inviteEdit, SIGNAL( returnPressed() ), SLOT( sendInvite() ) );
 
         if ( account->sipPlugin() )
         {
@@ -324,13 +344,16 @@ AccountWidget::setupConnections( const QPersistentModelIndex& idx, int accountId
     }
 }
 
+
 void
 AccountWidget::setConnectionState( bool state )
 {
     m_statusToggle->setChecked( state );
 }
 
-bool AccountWidget::connectionState() const
+
+bool
+AccountWidget::connectionState() const
 {
     return m_statusToggle->isChecked() || m_statusToggle->backChecked();
 }

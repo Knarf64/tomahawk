@@ -32,6 +32,8 @@
 #include "PlaylistInterface.h"
 #include "Source.h"
 
+#include <qjson/serializer.h>
+
 #include <qtkeychain/keychain.h>
 #include <QDir>
 
@@ -615,8 +617,12 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
     }
     else if ( oldVersion == 14 )
     {
+        //No upgrade on OSX: we keep storing credentials in TomahawkSettings
+        //because QtKeychain and/or OSX Keychain is flaky. --Teo 12/2013
+#ifndef Q_OS_MAC
         const QStringList accounts = value( "accounts/allaccounts" ).toStringList();
         tDebug() << "About to move these accounts to QtKeychain:" << accounts;
+
         //Move storage of Credentials from QSettings to QtKeychain
         foreach ( const QString& account, accounts )
         {
@@ -634,11 +640,20 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
 #if defined( Q_OS_UNIX ) && !defined( Q_OS_MAC )
                 j->setInsecureFallback( true );
 #endif
-                QByteArray data;
-                QDataStream ds( &data, QIODevice::WriteOnly );
-                ds << creds;
+                QJson::Serializer serializer;
+                bool ok;
+                QByteArray data = serializer.serialize( creds, &ok );
 
-                j->setBinaryData( data );
+                if ( ok )
+                {
+                    tDebug() << "Performing upgrade for account" << account;
+                }
+                else
+                {
+                    tDebug() << "Upgrade error: cannot serialize credentials to JSON for account" << account;
+                }
+
+                j->setTextData( data );
                 j->start();
             }
 
@@ -646,6 +661,7 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
 
             endGroup();
         }
+#endif //Q_OS_MAC
     }
 }
 
@@ -690,7 +706,7 @@ TomahawkSettings::scannerPaths() const
 {
     QString musicLocation;
 
-#if defined(Q_WS_X11)
+#if defined(Q_OS_LINUX)
     musicLocation = QDir::homePath() + QLatin1String("/Music");
 #endif
 

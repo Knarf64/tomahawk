@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -244,15 +245,15 @@ TrackData::updateAttributes()
 
 
 void
-TrackData::loadSocialActions()
+TrackData::loadSocialActions( bool force )
 {
-    if ( m_socialActionsLoaded )
+    if ( !force && m_socialActionsLoaded )
         return;
 
     m_socialActionsLoaded = true;
 
     DatabaseCommand_LoadSocialActions* cmd = new DatabaseCommand_LoadSocialActions( m_ownRef.toStrongRef() );
-    Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -274,6 +275,58 @@ TrackData::allSocialActions() const
 {
     QMutexLocker locker( &s_memberMutex );
     return m_allSocialActions;
+}
+
+
+QList< Tomahawk::SocialAction >
+TrackData::socialActions( const QString& actionName, const QVariant& value, bool filterDupeSourceNames )
+{
+    QMutexLocker locker( &s_memberMutex );
+
+    QList< Tomahawk::SocialAction > filtered;
+    foreach ( const Tomahawk::SocialAction& sa, m_allSocialActions )
+    {
+        if ( sa.action == actionName )
+        {
+            if ( !value.isNull() && sa.value != value )
+            {
+                Tomahawk::source_ptr srcWithBadValue = sa.source;
+                QList< Tomahawk::SocialAction>::iterator it = filtered.begin();
+                while ( it != filtered.end() )
+                {
+                    if ( it->source == srcWithBadValue )
+                        it = filtered.erase( it );
+                    else
+                        ++it;
+                }
+                continue;
+            }
+
+            bool dupe = false;
+            for ( QList< Tomahawk::SocialAction>::iterator it = filtered.begin();
+                  it != filtered.end(); ++it )
+            {
+                if ( it->source == sa.source ||
+                        ( filterDupeSourceNames &&
+                            ( it->source->friendlyName() == sa.source->friendlyName() ) ) )
+                {
+                    dupe = true;
+                    // we store the earliest timestamp in the sa we're keeping
+                    if ( it->timestamp.toInt() > sa.timestamp.toInt() )
+                        it->timestamp = sa.timestamp;
+                    // and always the new value
+                    it->value = sa.value;
+                    break;
+                }
+            }
+
+            if ( dupe )
+                continue;
+            filtered << sa;
+       }
+    }
+
+    return filtered;
 }
 
 
@@ -317,11 +370,10 @@ void
 TrackData::setLoved( bool loved )
 {
     m_currentSocialActions[ "Love" ] = loved;
+    emit socialActionsLoaded();
 
     DatabaseCommand_SocialAction* cmd = new DatabaseCommand_SocialAction( m_ownRef.toStrongRef(), QString( "Love" ), loved ? QString( "true" ) : QString( "false" ) );
-    Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
-
-    emit socialActionsLoaded();
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 

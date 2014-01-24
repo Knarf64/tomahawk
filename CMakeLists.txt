@@ -3,6 +3,16 @@ CMAKE_MINIMUM_REQUIRED( VERSION 2.8.6 )
 SET( CMAKE_MODULE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
 CMAKE_POLICY(SET CMP0017 NEW)
 
+IF ( CMAKE_VERSION VERSION_EQUAL 2.8.12 OR CMAKE_VERSION VERSION_GREATER 2.8.12 )
+CMAKE_POLICY(SET CMP0022 NEW)
+
+# TODO:
+# Update to NEW and fix things up when we can depend on 2.8.12
+CMAKE_POLICY(SET CMP0023 OLD)
+ENDIF()
+
+INCLUDE(CMakeDependentOption)
+
 ###
 ### Tomahawk application info
 ###
@@ -26,7 +36,7 @@ SET( TOMAHAWK_VERSION_MINOR 7 )
 SET( TOMAHAWK_VERSION_PATCH 100 )
 #SET( TOMAHAWK_VERSION_RC 0 )
 
-SET( TOMAHAWK_TRANSLATION_LANGUAGES ar bg bn_IN ca cs de en el es fi fr hi_IN hu gl it ja lt pl pt_BR ru sv tr zh_CN zh_TW )
+SET( TOMAHAWK_TRANSLATION_LANGUAGES ar bg bn_IN ca cs de en el es fi fr hi_IN hu gl it ja lt pl pt_BR ro ru sv tr zh_CN zh_TW )
 
 # enforce proper symbol exporting on all platforms
 add_definitions( "-fvisibility=hidden" )
@@ -38,14 +48,18 @@ option(BUILD_GUI "Build Tomahawk with GUI" ON)
 option(BUILD_RELEASE "Generate TOMAHAWK_VERSION without GIT info" OFF)
 option(BUILD_TESTS "Build Tomahawk with unit tests" ON)
 option(BUILD_HATCHET "Build the Hatchet plugin" OFF)
+option(BUILD_WITH_QT4 "Build Tomahawk with Qt4 no matter if Qt5 was found" ON)
 
 option(WITH_BREAKPAD "Build with breakpad integration" ON)
 option(WITH_CRASHREPORTER "Build with CrashReporter" ON)
 option(WITH_BINARY_ATTICA "Enable support for downloading binary resolvers automatically" ON)
 option(LEGACY_KDE_INTEGRATION "Install tomahawk.protocol file, deprecated since 4.6.0" OFF)
-option(WITH_UPOWER "Build with support for UPower events" OFF)
-option(WITH_GNOMESHORTCUTHANDLER "Build with shortcut handler for GNOME" OFF)
 option(WITH_KDE4 "Build with support for KDE specific stuff" ON)
+
+CMAKE_DEPENDENT_OPTION(WITH_UPOWER "Build with support for UPower events" ON
+       "UNIX;NOT APPLE" OFF)
+CMAKE_DEPENDENT_OPTION(WITH_GNOMESHORTCUTHANDLER "Build with shortcut handler for GNOME" ON
+       "UNIX;NOT APPLE" OFF)
 
 IF( CMAKE_SYSTEM_PROCESSOR MATCHES "arm" )
     message(STATUS "Build of breakpad library disabled on this platform.")
@@ -117,6 +131,11 @@ if( NOT BUILD_WITH_QT4 )
         find_package(Qt5Widgets QUIET)
         message(STATUS "Found Qt5! Be aware that Qt5-support is still experimental and not officially supported!")
 
+        if( UNIX AND NOT APPLE )
+            # We need this to find the paths to qdbusxml2cpp and co
+            find_package(Qt5DBus REQUIRED)
+        endif()
+
         macro(qt_wrap_ui)
             qt5_wrap_ui(${ARGN})
         endmacro()
@@ -143,8 +162,6 @@ if( NOT BUILD_WITH_QT4 )
 
         set(QT_RCC_EXECUTABLE "${Qt5Core_RCC_EXECUTABLE}")
         #FIXME: CrashReporter depends on deprecated QHttp
-        set(WITH_CRASHREPORTER OFF)
-        set(WITH_BREAKPAD OFF)
         set(WITH_KDE4 OFF)
     endif()
 endif()
@@ -211,24 +228,13 @@ if( BUILD_GUI AND UNIX AND NOT APPLE )
     find_package( X11 )
 endif()
 
-IF( UNIX AND NOT APPLE AND QT_QTDBUS_FOUND )
-    SET( WITH_UPOWER ON )
-    SET( WITH_GNOMESHORTCUTHANDLER ON )
-ENDIF( UNIX AND NOT APPLE AND QT_QTDBUS_FOUND  )
-
-macro_optional_find_package(Phonon 4.5.0)
-macro_log_feature(PHONON_FOUND "Phonon" "The Phonon multimedia library" "http://phonon.kde.org" TRUE "" "")
-if( PHONON_FOUND )
-    message(STATUS "Phonon found; ensure that phonon-vlc is at least 0.4")
-endif()
-
 macro_optional_find_package(Echonest 2.1.0)
 macro_log_feature(ECHONEST_FOUND "Echonest" "Qt library for communicating with The Echo Nest" "http://projects.kde.org/libechonest" TRUE "" "libechonest 2.1.0 is needed for dynamic playlists and the infosystem")
 
 macro_optional_find_package(CLucene 0.9.23)
 macro_log_feature(CLucene_FOUND "CLucene" "The open-source, C++ search engine" "http://clucene.sf.net" TRUE "" "CLucene is used for indexing the collection")
 
-macro_optional_find_package(QJSON)
+macro_optional_find_package(QJSON 0.8.1)
 macro_log_feature(QJSON_FOUND "QJson" "Qt library that maps JSON data to QVariant objects" "http://qjson.sf.net" TRUE "" "libqjson is used for encoding communication between Tomahawk instances")
 
 macro_optional_find_package(Taglib 1.6.0)
@@ -242,7 +248,12 @@ macro_log_feature(Boost_FOUND "Boost" "Provides free peer-reviewed portable C++ 
 macro_optional_find_package(QCA2)
 macro_log_feature(QCA2_FOUND "QCA2" "Provides encryption and signing functions necessary for some resolvers and accounts" "http://delta.affinix.com/qca/" TRUE "" "")
 
-macro_optional_find_package(LibAttica 0.4.0)
+if( TOMAHAWK_QT5 )
+    macro_optional_find_package(KF5Attica 1.0.0)
+    set(LIBATTICA_FOUND ${KF5Attica_FOUND})
+else()
+    macro_optional_find_package(LibAttica 0.4.0)
+endif()
 macro_log_feature(LIBATTICA_FOUND "libattica" "Provides support for installation of resolvers from the Tomahawk website" "https://projects.kde.org/projects/kdesupport/attica" TRUE "" "")
 
 macro_optional_find_package(QuaZip)
@@ -260,8 +271,19 @@ macro_log_feature(QTWEETLIB_FOUND "QTweetLib" "Qt Twitter Library" "https://gith
 macro_optional_find_package(LibLastFm 1.0.0)
 macro_log_feature(LIBLASTFM_FOUND "liblastfm" "Qt library for the Last.fm webservices" "https://github.com/lastfm/liblastfm" TRUE "" "liblastfm is needed for scrobbling tracks to Last.fm and fetching cover artwork")
 
-macro_optional_find_package(QtKeychain 0.1.0)
+if( NOT APPLE )
+if( TOMAHAWK_QT5 )
+    macro_optional_find_package(Qt5Keychain 0.1.0)
+else()
+    macro_optional_find_package(QtKeychain 0.1.0)
+endif()
 macro_log_feature(QTKEYCHAIN_FOUND "QtKeychain" "Provides support for secure credentials storage" "https://github.com/frankosterfeld/qtkeychain" TRUE "" "")
+endif()
+
+if( UNIX AND NOT APPLE )
+    macro_optional_find_package(TelepathyQt 0.9.3)
+    macro_log_feature(TelepathyQt4_FOUND "Telepathy-Qt" "Telepathy-Qt is a Qt high-level binding for Telepathy, a D-Bus framework for unifying real time communication." FALSE "" "Telepathy-Qt is needed for sharing Jabber/GTalk accounts with Telepathy.\n")
+endif()
 
 # we need pthreads too
 macro_optional_find_package(Threads)
@@ -303,11 +325,18 @@ if (WITH_KDE4)
     macro_optional_find_package(KDE4)
     macro_optional_find_package(KDE4Installed)
 endif(WITH_KDE4)
-# this was used before we had FindKDE4Installed, just leaving it here to keep the flags
-# for future kde integration
+macro_log_feature(KDE4_FOUND "KDE4" "Provides support for configuring Telepathy Accounts from inside Tomahawk" "https://www.kde.org" FALSE "" "")
 
-# macro_optional_find_package(KDE4)
-IF( KDE4_FOUND )
+if(NOT Phonon_FOUND)
+  macro_optional_find_package(Phonon 4.5.0)
+endif()
+macro_log_feature(Phonon_FOUND "Phonon" "The Phonon multimedia library" "http://phonon.kde.org" TRUE "" "")
+
+if(Phonon_FOUND)
+    message(STATUS "Phonon found; ensure that phonon-vlc is at least 0.4")
+endif()
+
+IF( KDE4_FOUND OR Phonon_FOUND )
     IF( CMAKE_C_FLAGS )
         # KDE4 adds and removes some compiler flags that we don't like
         # (only for gcc not for clang e.g.)
@@ -329,10 +358,10 @@ CONFIGURE_FILE(
   "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 
-# KDE4 defines an uninstall target for us automatically
-IF( NOT KDE4_FOUND )
-    ADD_CUSTOM_TARGET(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
-ENDIF()
+# KDE4 defines an uninstall target for us automatically (and at least with Qt4 Phonon does as well no matter if kdelibs was found)
+# IF( NOT KDE4_FOUND )
+#     ADD_CUSTOM_TARGET(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
+# ENDIF()
 
 IF( NOT APPLE )
     # Make linking as strict on linux as it is on osx. Then we don't break linking on mac so often
@@ -346,16 +375,11 @@ file(COPY TomahawkAddLibrary.cmake DESTINATION "${PROJECT_BINARY_DIR}")
 
 SET( TOMAHAWK_LIBRARIES tomahawklib )
 SET( TOMAHAWK_WIDGETS_LIBRARIES tomahawk-widgets )
+SET( TOMAHAWK_PLAYDARAPI_LIBRARIES tomahawk-playdarapi )
 
 ADD_SUBDIRECTORY( thirdparty )
 ADD_SUBDIRECTORY( src )
 ADD_SUBDIRECTORY( admin )
-
-if( BUILD_TESTS )
-    enable_testing()
-    add_subdirectory( tests )
-endif()
-
 
 # Add all targets to the build-tree export set
 set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Tomahawk" CACHE PATH  "Installation directory for CMake files")

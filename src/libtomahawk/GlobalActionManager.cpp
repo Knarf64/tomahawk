@@ -4,6 +4,7 @@
  *   Copyright (C) 2011, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright (C) 2011-2012, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright (C) 2013, Uwe L. Korn <uwelk@xhochy.com>
+ *   Copyright (C) 2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -360,6 +361,10 @@ GlobalActionManager::parseTomahawkLink( const QString& urlIn )
         {
             return handleImportCommand( u );
         }
+        else if ( cmdType == "love" )
+        {
+            return handleLoveCommand( u );
+        }
         else
         {
             tLog() << "Tomahawk link not supported, command not known!" << cmdType << u.path();
@@ -523,6 +528,38 @@ GlobalActionManager::handleOpenCommand( const QUrl& url )
     }
     // TODO user configurable in the UI
     return doQueueAdd( parts, urlQueryItems( url ) );
+}
+
+
+bool
+GlobalActionManager::handleLoveCommand( const QUrl& url )
+{
+    QStringList parts = url.path().split( "/" ).mid( 1 ); // get the rest of the command
+    if ( parts.isEmpty() )
+    {
+        tLog() << "No specific love command:" << url.toString();
+        return false;
+    }
+
+    QPair< QString, QString > pair;
+    QString title, artist, album;
+    foreach ( pair, urlQueryItems( url ) )
+    {
+        if ( pair.first == "title" )
+            title = pair.second;
+        else if ( pair.first == "artist" )
+            artist = pair.second;
+        else if ( pair.first == "album" )
+            album = pair.second;
+    }
+
+    track_ptr t = Track::get( artist, title, album );
+    if ( t.isNull() )
+        return false;
+
+    t->setLoved( true );
+
+    return true;
 }
 
 
@@ -731,7 +768,14 @@ GlobalActionManager::doQueueAdd( const QStringList& parts, const QList< QPair< Q
                 else
                 { // give it a web result hint
                     QFileInfo info( track.path() );
-                    query_ptr q = Query::get( QString(), info.baseName(), QString(), uuid(), false );
+
+                    QString artistText = track.host();
+                    if ( artistText.isEmpty() )
+                        artistText = info.absolutePath();
+                    if ( artistText.isEmpty() )
+                        artistText = track.toString();
+
+                    query_ptr q = Query::get( artistText, info.baseName(), QString(), uuid(), false );
 
                     if ( q.isNull() )
                         continue;
@@ -739,8 +783,6 @@ GlobalActionManager::doQueueAdd( const QStringList& parts, const QList< QPair< Q
                     q->setResultHint( track.toString() );
                     q->setSaveHTTPResultHint( true );
 
-
-                    q->setResultHint( track.toString() );
                     Pipeline::instance()->resolve( q );
 
                     ViewManager::instance()->queue()->model()->appendQuery( q );

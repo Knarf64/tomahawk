@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013-2014, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -25,11 +26,10 @@
 #include "DllMacro.h"
 
 class ColumnView;
-
-namespace Ui
-{
-    class ColumnViewPreviewWidget;
-}
+class QueryLabel;
+class PlayableCover;
+class QLabel;
+class ScrollingLabel;
 
 class DLLEXPORT ColumnViewPreviewWidget : public QWidget
 {
@@ -44,15 +44,33 @@ public:
 public slots:
     void setQuery( const Tomahawk::query_ptr& query );
 
-protected:
-    void changeEvent( QEvent* e );
-
 private slots:
     void onCoverUpdated();
+    void onArtistClicked();
 
 private:
-    Ui::ColumnViewPreviewWidget* ui;
     Tomahawk::query_ptr m_query;
+
+    PlayableCover* m_cover;
+
+    QLabel* m_ageLabel;
+    QLabel* m_ageValue;
+
+    QLabel* m_bitrateLabel;
+    QLabel* m_bitrateValue;
+
+    QLabel* m_composerLabel;
+    QLabel* m_composerValue;
+
+    QLabel* m_durationLabel;
+    QLabel* m_durationValue;
+
+    QLabel* m_yearLabel;
+    QLabel* m_yearValue;
+
+    ScrollingLabel* m_trackLabel;
+
+    QueryLabel* m_artistLabel;
 };
 
 #endif // COLUMNVIEWPREVIEWWIDGET_H

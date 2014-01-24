@@ -1,6 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
@@ -25,6 +25,7 @@
 #include "Result.h"
 #include "audio/AudioEngine.h"
 #include "utils/XspfLoader.h"
+#include "utils/DpiScaler.h"
 
 #include "config.h"
 
@@ -38,7 +39,6 @@
     #include <shobjidl.h>
 #endif
 
-class SettingsDialog;
 namespace Tomahawk
 {
     namespace Accounts
@@ -67,7 +67,7 @@ namespace Ui
     class GlobalSearchWidget;
 }
 
-class TomahawkWindow : public QMainWindow
+class TomahawkWindow : public QMainWindow, private TomahawkUtils::DpiScaler
 {
 Q_OBJECT
 
@@ -92,7 +92,6 @@ protected:
 #endif
 
 public slots:
-    void createAutomaticPlaylist( QString );
     void createStation();
     void createPlaylist();
     void loadSpiff();
@@ -138,15 +137,15 @@ private slots:
     void maximize();
     void toggleFullscreen();
 
-    void playlistCreateDialogFinished( int ret );
-
     void crashNow();
 
     void toggleMenuBar();
     void balanceToolbar();
 
+#ifdef Q_OS_WIN
     void audioStateChanged( AudioState newState, AudioState oldState );
     void updateWindowsLoveButton();
+#endif
 
 private:
     void loadSettings();
@@ -157,16 +156,16 @@ private:
     void setupMenuBar();
     void setupToolBar();
     void setupSideBar();
+    void setupStatusBar();
+    void setupShortcuts();
     void setupUpdateCheck();
 
 #ifdef Q_OS_WIN
     bool setupWindowsButtons();
     const unsigned int m_buttonCreatedID;
     HICON thumbIcon(TomahawkUtils::ImageType type);
-  #ifdef HAVE_THUMBBUTTON
     ITaskbarList3* m_taskbarList;
     THUMBBUTTON m_thumbButtons[5];
-  #endif
     enum TB_STATES{ TP_PREVIOUS = 0,TP_PLAY_PAUSE = 1,TP_NEXT = 2,TP_LOVE = 4 };
 #endif
 
@@ -180,7 +179,6 @@ private:
     QueueView* m_queueView;
     AnimatedSplitter* m_sidebar;
     JobStatusSortModel* m_jobsModel;
-    SettingsDialog* m_settingsDialog;
 
     // Menus and menu actions: Accounts menu
     QMenuBar    *m_menuBar;

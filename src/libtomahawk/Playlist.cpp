@@ -461,7 +461,6 @@ Playlist::setNewRevision( const QString& rev,
     QMap<QString, plentry_ptr> entriesmap;
     foreach ( const plentry_ptr& p, d->entries )
     {
-        tDebug() << p->guid() << p->query()->toString();
         entriesmap.insert( p->guid(), p );
     }
 
@@ -504,9 +503,12 @@ void
 Playlist::removeFromDatabase()
 {
     Q_D( Playlist );
+
+    emit aboutToBeDeleted( d->weakSelf.toStrongRef() );
     DatabaseCommand_DeletePlaylist* cmd = new DatabaseCommand_DeletePlaylist( d->source, d->guid );
-    Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
+
 
 Playlist::Playlist( PlaylistPrivate *d )
     : d_ptr( d )
@@ -907,7 +909,6 @@ Playlist::updaters() const
 void
 PlaylistRemovalHandler::remove( const playlist_ptr& playlist )
 {
-    emit playlist->aboutToBeDeleted( playlist );
     playlist->removeFromDatabase();
 }
 

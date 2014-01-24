@@ -72,6 +72,7 @@ using namespace Accounts;
 #define TOMAHAWK_CAP_NODE_NAME QLatin1String( "http://tomahawk-player.org/" )
 
 
+#if QT_VERSION <= QT_VERSION_CHECK( 5, 0, 0 )
 void
 JreenMessageHandler( QtMsgType type, const char *msg )
 {
@@ -91,6 +92,7 @@ JreenMessageHandler( QtMsgType type, const char *msg )
             abort();
     }
 }
+#endif
 
 
 XmppSipPlugin::XmppSipPlugin( Account* account )
@@ -102,7 +104,9 @@ XmppSipPlugin::XmppSipPlugin( Account* account )
     , m_pubSubManager( 0 )
 #endif
 {
+#if QT_VERSION <= QT_VERSION_CHECK( 5, 0, 0 )
     Jreen::Logger::addHandler( JreenMessageHandler );
+#endif
 
     m_currentUsername = readUsername();
     m_currentServer = readServer();
@@ -117,7 +121,7 @@ XmppSipPlugin::XmppSipPlugin( Account* account )
     setupClientHelper();
 
     m_client->registerPayload( new TomahawkXmppMessageFactory );
-    m_currentResource = QString::fromAscii( "tomahawk%1" ).arg( QString::number( qrand() % 10000 ) );
+    m_currentResource = QString( "tomahawk%1" ).arg( QString::number( qrand() % 10000 ) );
     m_client->setResource( m_currentResource );
 
 #ifndef ENABLE_HEADLESS
@@ -359,6 +363,13 @@ XmppSipPlugin::onDisconnect( Jreen::Client::DisconnectReason reason )
             break;
     }
     m_state = Account::Disconnected;
+
+    // Set the state of all peers to offline.
+    foreach( Jreen::JID peer, m_peers.keys() )
+    {
+        m_peers[ peer ] = Jreen::Presence::Unavailable;
+    }
+
     emit stateChanged( m_state );
 
     removeMenuHelper();
@@ -454,20 +465,28 @@ XmppSipPlugin::sendSipInfos( const Tomahawk::peerinfo_ptr& receiver, const QList
 }
 
 
-void
-XmppSipPlugin::addContact( const QString& jid, const QString& msg )
+bool
+XmppSipPlugin::addContact( const QString& jid, AddContactOptions options, const QString& msg )
 {
     // Add contact to the Tomahawk group on the roster
     QStringList jidParts = jid.split( '@' );
     if ( jidParts.count() == 2 && !jidParts[0].trimmed().isEmpty() && !jidParts[1].trimmed().isEmpty() )
     {
         m_roster->subscribe( jid, msg, jid, QStringList() << "Tomahawk" );
-        emit inviteSentSuccess( jid );
+
+        if ( options & SendInvite )
+        {
+            emit inviteSentSuccess( jid );
+        }
+        return true;
     }
-    else
+
+    if ( options & SendInvite )
     {
         emit inviteSentFailure( jid );
     }
+
+    return false;
 }
 
 
@@ -483,7 +502,7 @@ XmppSipPlugin::showAddFriendDialog()
         return;
 
     qDebug() << "Attempting to add xmpp contact to roster:" << id;
-    addContact( id );
+    addContact( id, SendInvite );
 #endif
 }
 
@@ -836,7 +855,7 @@ XmppSipPlugin::onSubscriptionRequestConfirmed( int result )
     if ( allowSubscription == QMessageBox::Yes )
     {
         qDebug() << Q_FUNC_INFO << jid.bare() << "accepted by user, adding to roster";
-        addContact( jid, "" );
+        addContact( jid );
     }
     else
     {

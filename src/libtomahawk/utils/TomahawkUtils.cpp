@@ -165,7 +165,7 @@ appDataDir()
 {
     QString path;
 
-    #ifdef Q_WS_WIN
+    #ifdef Q_OS_WIN
         if ( ( QSysInfo::WindowsVersion & QSysInfo::WV_DOS_based ) == 0 )
         {
             // Use this for non-DOS-based Windowses
@@ -177,9 +177,9 @@ appDataDir()
                 path = QString::fromLocal8Bit( acPath );
             }
         }
-    #elif defined(Q_WS_MAC)
+    #elif defined(Q_OS_MAC)
         path = appSupportFolderPath();
-    #elif defined(Q_WS_X11)
+    #elif defined(Q_OS_LINUX)
         path = QDir::home().filePath( ".local/share" );
     #else
         path = QCoreApplication::applicationDirPath();
@@ -543,7 +543,7 @@ md5( const QByteArray& data )
 bool
 isHttpResult( const QString& url )
 {
-    return url.startsWith( "http://" ) || url.startsWith( "https://" );
+    return url.startsWith( "http://" ); // || url.startsWith( "https://" );
 }
 
 
@@ -773,10 +773,10 @@ extractBinaryResolver( const QString& zipFilename, QObject* receiver )
 
 
 bool
-whitelistedHttpResultHint( const QString& url )
+whitelistedHttpResultHint( const QUrl& url )
 {
     // For now, just http/https
-    return url.startsWith( "http" );
+    return ( url.scheme().startsWith( "http" ) && !url.host().endsWith( "youtube.com" ) );
 }
 
 

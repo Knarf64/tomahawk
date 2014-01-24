@@ -36,13 +36,14 @@
 class Connection;
 class Connector;
 class ControlConnection;
-class StreamConnection;
+class NetworkReply;
+class PeerInfo;
+class PortFwdThread;
 class ProxyConnection;
 class QTcpSocketExtra;
 class RemoteCollectionConnection;
-class PortFwdThread;
-class PeerInfo;
 class SipInfo;
+class StreamConnection;
 
 namespace boost
 {
@@ -51,6 +52,7 @@ namespace boost
 
 typedef boost::function< void( const Tomahawk::result_ptr&,
                                boost::function< void( QSharedPointer< QIODevice >& ) > )> IODeviceFactoryFunc;
+typedef boost::function< void ( QSharedPointer< QIODevice >& ) > IODeviceCallback;
 
 class ServentPrivate;
 
@@ -148,7 +150,11 @@ signals:
     void ready();
 
 protected:
-    void incomingConnection( int sd );
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    virtual void incomingConnection( qintptr sd );
+#else
+    virtual void incomingConnection( int sd );
+#endif
 
 public slots:
     void setExternalAddress( QHostAddress ha, unsigned int port );
@@ -162,6 +168,7 @@ public slots:
     void triggerDBSync();
 
     void onSipInfoChanged();
+    void httpIODeviceReady( NetworkReply* reply, IODeviceCallback callback );
 
 private slots:
     void deleteLazyOffer( const QString& key );

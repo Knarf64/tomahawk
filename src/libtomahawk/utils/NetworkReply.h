@@ -44,15 +44,22 @@ public:
 signals:
     void redirected();
 
+    void finalUrlReached();
+    void finalUrlReached( const QUrl& finalUrlReached );
+
     void finished();
     void finished( const QUrl& finalUrl );
     void error( QNetworkReply::NetworkError error );
 
 private slots:
     void deletedByParent();
+    void metaDataChanged();
     void networkLoadFinished();
 
 private:
+    void connectReplySignals();
+    void disconnectReplySignals();
+    void emitFinished( const QUrl& url );
     void load( const QUrl& url );
 
     QStringList m_blacklistedHosts;
@@ -60,5 +67,9 @@ private:
     QNetworkReply* m_reply;
     QUrl m_url;
 };
+
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    Q_DECLARE_METATYPE( NetworkReply* )
+#endif
 
 #endif // NETWORKREPLY_H

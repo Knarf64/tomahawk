@@ -48,12 +48,12 @@ HatchetSipPlugin::HatchetSipPlugin( Tomahawk::Accounts::Account *account )
 {
     tLog() << Q_FUNC_INFO;
 
-    connect( m_account, SIGNAL( accessTokensFetched() ), this, SLOT( connectWebSocket() ) );
+    connect( m_account, SIGNAL( accessTokenFetched() ), this, SLOT( connectWebSocket() ) );
     connect( Servent::instance(), SIGNAL( dbSyncTriggered() ), this, SLOT( dbSyncTriggered() ));
 
     QFile pemFile( ":/hatchet-account/dreamcatcher.pem" );
     pemFile.open( QIODevice::ReadOnly );
-    tDebug() << Q_FUNC_INFO << "certs/dreamcatcher.pem: " << pemFile.readAll();
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "certs/dreamcatcher.pem: " << pemFile.readAll();
     pemFile.close();
     pemFile.open( QIODevice::ReadOnly );
     QCA::ConvertResult conversionResult;
@@ -113,7 +113,7 @@ HatchetSipPlugin::connectPlugin()
     }
 
     hatchetAccount()->setConnectionState( Tomahawk::Accounts::Account::Connecting );
-    hatchetAccount()->fetchAccessTokens();
+    hatchetAccount()->fetchAccessToken( "dreamcatcher" );
 }
 
 
@@ -156,42 +156,18 @@ HatchetSipPlugin::connectWebSocket()
       return;
     }
 
-    m_token.clear();
+    m_token = m_account->credentials()[ "dreamcatcher_access_token" ].toString();
 
-    QVariantList tokensCreds = m_account->credentials()[ "dreamcatchertokens" ].toList();
 
-    //FIXME: Don't blindly pick the first one that matches? Most likely, cycle through if the first one fails
-    QVariantMap connectVals;
-    foreach ( QVariant credObj, tokensCreds )
+    if ( m_token.isEmpty() )
     {
-        QVariantMap creds = credObj.toMap();
-        if ( creds.contains( "type" ) && creds[ "type" ].toString() == "dreamcatcher" )
-        {
-            connectVals = creds;
-            m_token = creds[ "token" ].toString();
-            break;
-        }
-    }
-
-    QString url;
-    if ( !connectVals.isEmpty() )
-    {
-        QString port = connectVals[ "port" ].toString();
-        if ( port == "443" )
-            url = "wss://";
-        else
-            url = "ws://";
-        url += connectVals[ "host" ].toString() + ':' + connectVals[ "port" ].toString();
-    }
-
-    if ( url.isEmpty() || m_token.isEmpty() )
-    {
-        tLog() << Q_FUNC_INFO << "Unable to find a proper connection endpoint; bailing";
+        tLog() << Q_FUNC_INFO << "Unable to find an access token"; 
         disconnectPlugin();
         return;
     }
-    else
-        tLog() << Q_FUNC_INFO << "Connecting to Dreamcatcher endpoint at: " << url;
+
+    QString url( "wss://dreamcatcher.hatchet.is:443" );
+    tLog() << Q_FUNC_INFO << "Connecting to Dreamcatcher endpoint at: " << url;
 
     m_webSocketThreadController->setUrl( url );
     m_webSocketThreadController->start();
@@ -217,7 +193,7 @@ HatchetSipPlugin::webSocketConnected()
     QCA::SecureArray sa( m_uuid.toLatin1() );
     QCA::SecureArray result = m_publicKey->encrypt( sa, QCA::EME_PKCS1_OAEP );
 
-    tDebug() << Q_FUNC_INFO << "uuid:" << m_uuid << ", size of uuid:" << m_uuid.size() << ", size of sa:" << sa.size() << ", size of result:" << result.size();
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "uuid:" << m_uuid << ", size of uuid:" << m_uuid.size() << ", size of sa:" << sa.size() << ", size of result:" << result.size();
 
     QVariantMap nonceVerMap;
     nonceVerMap[ "version" ] = VERSION;
@@ -261,7 +237,6 @@ HatchetSipPlugin::webSocketDisconnected()
 bool
 HatchetSipPlugin::sendBytes( const QVariantMap& jsonMap ) const
 {
-    tLog() << Q_FUNC_INFO;
     if ( m_sipState == Closed )
     {
         tLog() << Q_FUNC_INFO << "was told to send bytes on a closed connection, not gonna do it";
@@ -276,7 +251,7 @@ HatchetSipPlugin::sendBytes( const QVariantMap& jsonMap ) const
         return false;
     }
 
-    tDebug() << Q_FUNC_INFO << "Sending bytes of size" << bytes.size();
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Sending bytes of size" << bytes.size();
     emit rawBytes( bytes );
     return true;
 }
@@ -285,7 +260,7 @@ HatchetSipPlugin::sendBytes( const QVariantMap& jsonMap ) const
 void
 HatchetSipPlugin::messageReceived( const QByteArray &msg )
 {
-    tDebug() << Q_FUNC_INFO << "WebSocket message: " << msg;
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "WebSocket message: " << msg;
 
     QJson::Parser parser;
     bool ok;
@@ -553,7 +528,6 @@ HatchetSipPlugin::sendOplog( const QVariantMap& valMap ) const
 void
 HatchetSipPlugin::oplogFetched( const QString& sinceguid, const QString& /* lastguid */, const QList< dbop_ptr > ops )
 {
-    tDebug() << Q_FUNC_INFO;
     const uint_fast32_t byteMax = 1 << 25;
     int currBytes = 0;
     QVariantMap commandMap;

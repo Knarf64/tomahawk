@@ -33,6 +33,10 @@ IF( LIBLASTFM_FOUND )
 ENDIF( LIBLASTFM_FOUND )
 
 SET( tomahawkSourcesGui ${tomahawkSourcesGui}
+     dialogs/DiagnosticsDialog.cpp
+     dialogs/LoadXSPFDialog.cpp
+     dialogs/SettingsDialog.cpp
+
      sourcetree/SourcesModel.cpp
      sourcetree/SourcesProxyModel.cpp
      sourcetree/SourceTreeView.cpp
@@ -52,11 +56,7 @@ SET( tomahawkSourcesGui ${tomahawkSourcesGui}
 
      TomahawkTrayIcon.cpp
      AudioControls.cpp
-     SettingsDialog.cpp
-     DiagnosticsDialog.cpp
      TomahawkWindow.cpp
-     LoadXSPFDialog.cpp
-     SocialWidget.cpp
 
      widgets/ContainedMenuButton.cpp
      widgets/AccountListView.cpp
@@ -66,6 +66,8 @@ SET( tomahawkSourcesGui ${tomahawkSourcesGui}
      widgets/AccountsPopupWidget.cpp
      widgets/AccountsToolButton.cpp
      widgets/SlideSwitchButton.cpp
+     widgets/SocialWidget.cpp
+     widgets/SplashWidget.cpp
      widgets/UnstyledFrame.cpp
 )
 
@@ -74,16 +76,19 @@ IF( WITH_BREAKPAD )
 ENDIF()
 
 SET( tomahawkUI ${tomahawkUI}
+     dialogs/DiagnosticsDialog.ui
+     dialogs/HostDialog.ui
+     dialogs/LoadXSPFDialog.ui
+     dialogs/ProxyDialog.ui
+     dialogs/Settings_Accounts.ui
+     dialogs/Settings_Advanced.ui
+     dialogs/Settings_Collection.ui
+
      TomahawkWindow.ui
-     DiagnosticsDialog.ui
-     Settings_Accounts.ui
-     Settings_Advanced.ui
-     Settings_Collection.ui
-     ProxyDialog.ui
 
      AudioControls.ui
-     LoadXSPFDialog.ui
-     SocialWidget.ui
+
+     widgets/SocialWidget.ui
 )
 
 INCLUDE_DIRECTORIES(
@@ -98,19 +103,12 @@ INCLUDE_DIRECTORIES(
     ${THIRDPARTY_DIR}/breakpad
 
     ${TAGLIB_INCLUDES}
-    ${PHONON_INCLUDES}
     ${QJSON_INCLUDE_DIR}
     ${LIBATTICA_INCLUDE_DIR}
     ${ECHONEST_INCLUDE_DIR}
     ${LIBLASTFM_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIR}
 )
-
-IF( QXTWEB_FOUND )
-    LIST(APPEND tomahawkSources web/Api_v1.cpp)
-    LIST(APPEND LINK_LIBRARIES ${QXTWEB_LIBRARIES})
-    INCLUDE_DIRECTORIES(${QXTWEB_INCLUDE_DIRS})
-ENDIF()
 
 SET( OS_SPECIFIC_LINK_LIBRARIES "" )
 
@@ -184,8 +182,8 @@ ENDIF()
 TARGET_LINK_LIBRARIES( tomahawk_bin
     ${LINK_LIBRARIES}
     ${TOMAHAWK_WIDGETS_LIBRARIES}
+    ${TOMAHAWK_PLAYDARAPI_LIBRARIES}
     ${TOMAHAWK_LIBRARIES}
-    ${PHONON_LIBS}
     ${OS_SPECIFIC_LINK_LIBRARIES}
     ${QT_LIBRARIES}
     ${MAC_EXTRA_LIBS}

@@ -42,7 +42,6 @@
     #include "utils/PixmapDelegateFader.h"
 #endif
 
-
 #include <QKeyEvent>
 #include <QPainter>
 #include <QScrollBar>
@@ -130,6 +129,9 @@ TrackView::guid() const
 void
 TrackView::setGuid( const QString& newguid )
 {
+    if ( newguid == m_guid )
+        return;
+
     if ( !newguid.isEmpty() )
     {
         tDebug() << Q_FUNC_INFO << "Setting guid on header" << newguid << "for a view with" << m_proxyModel->columnCount() << "columns";
@@ -216,7 +218,6 @@ TrackView::setPlayableModel( PlayableModel* model )
     switch( m_proxyModel->style() )
     {
         case PlayableProxyModel::Short:
-        case PlayableProxyModel::ShortWithAvatars:
         case PlayableProxyModel::Large:
             setHeaderHidden( true );
             setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
@@ -476,7 +477,6 @@ TrackView::dragEnterEvent( QDragEnterEvent* event )
 void
 TrackView::dragMoveEvent( QDragMoveEvent* event )
 {
-    tDebug() << Q_FUNC_INFO;
     QTreeView::dragMoveEvent( event );
 
     if ( model()->isReadOnly() )
@@ -536,8 +536,10 @@ TrackView::dropEvent( QDropEvent* event )
     {
         tDebug() << "Ignoring accepted event!";
     }
-    else
+    else if ( event->source() != this )
     {
+        // This code shouldn't be required when the PlayableModel properly accepts the incoming drop.
+        // If we remove it, the queue for some reason doesn't accept the drops yet, though.
         if ( DropJob::acceptsMimeData( event->mimeData() ) )
         {
             const QPoint pos = event->pos();
@@ -797,11 +799,16 @@ TrackView::deleteSelectedItems()
 void
 TrackView::verifySize()
 {
-    if ( !autoResize() || !m_proxyModel )
+    if ( !autoResize() || !m_proxyModel || !m_proxyModel->rowCount() )
         return;
 
-    if ( m_proxyModel->rowCount() > 0 )
-        setFixedHeight( m_proxyModel->rowCount() * m_delegate->sizeHint( QStyleOptionViewItem(), m_proxyModel->index( 0, 0 ) ).height() + frameWidth() * 2 );
+    unsigned int height = 0;
+    for ( int i = 0; i < m_proxyModel->rowCount(); i++ )
+    {
+        height += indexRowSizeHint( m_proxyModel->index( i, 0 ) );
+    }
+
+    setFixedHeight( height + contentsMargins().top() + contentsMargins().bottom() );
 }
 
 

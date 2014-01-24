@@ -24,6 +24,7 @@
 #include "accounts/AccountManager.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
+#include "network/acl/AclRegistry.h"
 #include "network/Msg.h"
 #include "network/ConnectionManager.h"
 #include "network/DbSyncConnection.h"
@@ -34,8 +35,8 @@
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
 #include "utils/NetworkAccessManager.h"
+#include "utils/NetworkReply.h"
 
-#include "AclRegistry.h"
 #include "Connection.h"
 #include "ControlConnection.h"
 #include "PortFwdThread.h"
@@ -62,6 +63,7 @@ Q_DECLARE_METATYPE( QList< SipInfo > )
 Q_DECLARE_METATYPE( Connection* )
 Q_DECLARE_METATYPE( QTcpSocketExtra* )
 Q_DECLARE_METATYPE( Tomahawk::peerinfo_ptr )
+Q_DECLARE_METATYPE( IODeviceCallback )
 
 using namespace Tomahawk;
 
@@ -148,7 +150,11 @@ Servent::startListening( QHostAddress ha, bool upnp, int port, Tomahawk::Network
         }
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    if ( ha == QHostAddress::Any )
+#else
     if ( ha == QHostAddress::AnyIPv6 )
+#endif
     {
         // We are listening on all available addresses, so we should send a SipInfo for all of them.
         foreach ( QHostAddress addr, QNetworkInterface::allAddresses() )
@@ -354,6 +360,7 @@ Servent::deleteLazyOffer( const QString& key )
         timer->deleteLater();
     }
 }
+
 
 void
 Servent::registerControlConnection( ControlConnection* conn )
@@ -569,7 +576,11 @@ Servent::handleSipInfo( const Tomahawk::peerinfo_ptr& peerInfo )
 
 
 void
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+Servent::incomingConnection( qintptr sd )
+#else
 Servent::incomingConnection( int sd )
+#endif
 {
     Q_ASSERT( this->thread() == QThread::currentThread() );
 
@@ -834,7 +845,7 @@ Servent::handoverSocket( Connection* conn, QTcpSocketExtra* sock )
 
 
 void
-Servent::cleanupSocket( QTcpSocketExtra *sock )
+Servent::cleanupSocket( QTcpSocketExtra* sock )
 {
     if ( !sock )
     {
@@ -859,7 +870,7 @@ Servent::initiateConnection( const SipInfo& sipInfo, Connection* conn )
     Q_ASSERT( conn );
 
     // Check that we are not connecting to ourselves
-    foreach( QHostAddress ha, d_func()->externalAddresses )
+    foreach ( QHostAddress ha, d_func()->externalAddresses )
     {
         if ( sipInfo.host() == ha.toString() )
         {
@@ -956,6 +967,7 @@ Servent::checkACLResult( const QString& nodeid, const QString& username, Tomahaw
     // We have a result, so remove from queue
     d_func()->queuedForACLResult[username].remove( nodeid );
 }
+
 
 void
 Servent::ipDetected()
@@ -1065,6 +1077,7 @@ Servent::additionalPort() const
     return d_func()->externalPort;
 }
 
+
 bool
 equalByIPv6Address( QHostAddress a1, QHostAddress a2 )
 {
@@ -1078,6 +1091,7 @@ equalByIPv6Address( QHostAddress a1, QHostAddress a2 )
     }
     return true;
 }
+
 
 // return the appropriate connection for a given offer key, or NULL if invalid
 Connection*
@@ -1320,7 +1334,7 @@ Servent::numConnectedPeers() const
 }
 
 
-QList<StreamConnection *>
+QList<StreamConnection*>
 Servent::streams() const
 {
     return d_func()->scsessions;
@@ -1398,10 +1412,21 @@ Servent::httpIODeviceFactory( const Tomahawk::result_ptr& result,
                               boost::function< void ( QSharedPointer< QIODevice >& ) > callback )
 {
     QNetworkRequest req( result->url() );
-    QNetworkReply* reply = Tomahawk::Utils::nam()->get( req );
+    // Follow HTTP Redirects
+    NetworkReply* reply = new NetworkReply( Tomahawk::Utils::nam()->get( req ) );
+    qRegisterMetaType<NetworkReply*>("NetworkReply*");
+    qRegisterMetaType<IODeviceCallback>("IODeviceCallback");
+    NewClosure( reply, SIGNAL( finalUrlReached() ),
+                this, SLOT( httpIODeviceReady( NetworkReply*, IODeviceCallback ) ),
+                reply, callback )->setAutoDelete( true );
+}
 
+
+void
+Servent::httpIODeviceReady( NetworkReply* reply, IODeviceCallback callback )
+{
     //boost::functions cannot accept temporaries as parameters
-    QSharedPointer< QIODevice > sp = QSharedPointer< QIODevice >( reply, &QObject::deleteLater );
+    QSharedPointer< QIODevice > sp = QSharedPointer< QIODevice >( reply->reply(), &QObject::deleteLater );
     callback( sp );
 }
 

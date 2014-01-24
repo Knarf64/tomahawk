@@ -235,12 +235,15 @@ GridItemDelegate::paint( QPainter* painter, const QStyleOptionViewItem& option, 
 void
 GridItemDelegate::onPlayClicked( const QPersistentModelIndex& index )
 {
-    QPoint pos = m_playButton[ index ]->pos();
     clearButtons();
 
     AnimatedSpinner* spinner = new AnimatedSpinner( m_view );
     spinner->setAutoCenter( false );
     spinner->fadeIn();
+
+    QPoint pos = m_view->visualRect( index ).center() - QPoint( ( spinner->width() ) / 2 - 1,
+                                                                ( spinner->height() ) / 2 - 1 );
+
     spinner->move( pos );
     spinner->setFocusPolicy( Qt::NoFocus );
     spinner->installEventFilter( this );

@@ -47,11 +47,9 @@ TrackInfoWidget::TrackInfoWidget( const Tomahawk::query_ptr& query, QWidget* par
     ui->statsLabel->setStyleSheet( "QLabel { background-image:url(); border: 2px solid #dddddd; background-color: #faf9f9; border-radius: 4px; padding: 12px; }" );
     ui->statsLabel->setVisible( false );
 
-    ui->lyricsView->setStyleSheet( "QTextBrowser#lyricsView { background-color: transparent; }" );
-    ui->lyricsView->setFrameShape( QFrame::NoFrame );
-    ui->lyricsView->setAttribute( Qt::WA_MacShowFocusRect, 0 );
-    ui->lyricsView->setVisible( false ); // FIXME eventually
-    TomahawkStyle::styleScrollBar( ui->lyricsView->verticalScrollBar() );
+/*    ui->lyricsView->setVisible( false ); // FIXME eventually
+    TomahawkStyle::stylePageFrame( ui->lyricsView );
+    TomahawkStyle::styleScrollBar( ui->lyricsView->verticalScrollBar() );*/
 
     ui->lineAbove->setStyleSheet( QString( "QFrame { border: 1px solid %1; }" ).arg( TomahawkStyle::HEADER_BACKGROUND.name() ) );
     ui->lineBelow->setStyleSheet( QString( "QFrame { border: 1px solid black; }" ) );
@@ -82,10 +80,10 @@ TrackInfoWidget::TrackInfoWidget( const Tomahawk::query_ptr& query, QWidget* par
         ui->similarTracksView->setEmptyTip( tr( "Sorry, but we could not find similar tracks for this song!" ) );
         ui->similarTracksView->setAutoResize( true );
         ui->similarTracksView->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
-        ui->similarTracksView->setStyleSheet( "QListView { background-color: transparent; }" );
         //    TomahawkUtils::styleScrollBar( ui->similarTracksView->verticalScrollBar() );
         //    ui->similarTracksView->setStyleSheet( "QListView { background-color: transparent; } QListView::item { background-color: transparent; }" );
 
+        TomahawkStyle::stylePageFrame( ui->similarTracksView );
         TomahawkStyle::stylePageFrame( ui->frame );
     }
 
@@ -133,12 +131,12 @@ TrackInfoWidget::TrackInfoWidget( const Tomahawk::query_ptr& query, QWidget* par
         ui->statsLabel->setFont( f );
     }
 
-    {
+    /*{
         QPalette p = ui->lyricsView->palette();
         p.setColor( QPalette::Foreground, TomahawkStyle::PAGE_FOREGROUND );
         p.setColor( QPalette::Text, TomahawkStyle::PAGE_FOREGROUND );
         ui->lyricsView->setPalette( p );
-    }
+    }*/
 
     {
         m_scrollArea = new QScrollArea();
@@ -312,14 +310,14 @@ void
 TrackInfoWidget::onSimilarTracksLoaded()
 {
     m_relatedTracksModel->appendQueries( m_query->track()->similarTracks() );
-    m_relatedTracksModel->finishLoading();
+    m_relatedTracksModel->ensureResolved();
 }
 
 
 void
 TrackInfoWidget::onLyricsLoaded()
 {
-    ui->lyricsView->setHtml( m_query->track()->lyrics().join( "<br/>" ) );
+//    ui->lyricsView->setHtml( m_query->track()->lyrics().join( "<br/>" ) );
 }
 
 

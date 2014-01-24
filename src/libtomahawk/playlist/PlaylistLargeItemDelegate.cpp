@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,7 +21,6 @@
 
 #include <QApplication>
 #include <QPainter>
-#include <QAbstractTextDocumentLayout>
 #include <QDateTime>
 
 #include "Query.h"
@@ -62,35 +62,10 @@ PlaylistLargeItemDelegate::sizeHint( const QStyleOptionViewItem& option, const Q
 {
     QSize size = QStyledItemDelegate::sizeHint( option, index );
 
-    int rowHeight = option.fontMetrics.height() + 8;
-    size.setHeight( rowHeight * 3 );
+    int rowHeight = option.fontMetrics.height() + 5;
+    size.setHeight( rowHeight * 2.5 );
 
     return size;
-}
-
-
-void
-PlaylistLargeItemDelegate::drawRichText( QPainter* painter, const QStyleOptionViewItem& option, const QRect& rect, int flags, QTextDocument& text ) const
-{
-    Q_UNUSED( option );
-
-    text.setPageSize( QSize( rect.width(), QWIDGETSIZE_MAX ) );
-    QAbstractTextDocumentLayout* layout = text.documentLayout();
-
-    const int height = qRound( layout->documentSize().height() );
-    int y = rect.y();
-    if ( flags & Qt::AlignBottom )
-        y += ( rect.height() - height );
-    else if ( flags & Qt::AlignVCenter )
-        y += ( rect.height() - height ) / 2;
-
-    QAbstractTextDocumentLayout::PaintContext context;
-    context.palette.setColor( QPalette::Text, painter->pen().color() );
-
-    painter->save();
-    painter->translate( rect.x(), y );
-    layout->draw( painter, context );
-    painter->restore();
 }
 
 
@@ -124,8 +99,9 @@ PlaylistLargeItemDelegate::paint( QPainter* painter, const QStyleOptionViewItem&
         return;
 
     const track_ptr track = item->query()->track();
+
+    //TODO: lowerText isn't displayed any more, get rid of the code path once we have an alternative
     QString lowerText;
-    QSize avatarSize( 32, 32 );
 
     if ( m_mode == RecentlyPlayed && item->playbackLog().source )
     {
@@ -194,26 +170,39 @@ PlaylistLargeItemDelegate::paint( QPainter* painter, const QStyleOptionViewItem&
             rightRect.moveLeft( rightRect.left() - ( leftRectBefore.width() - leftRect.width() ) );
         }
 
-        painter->setFont( m_bigBoldFont );
+        QFont bigBoldFont = m_bigBoldFont;
+        bigBoldFont.setPointSize( TomahawkUtils::defaultFontSize() + 3 );
+        bigBoldFont.setWeight( 99 );
+
+        painter->setFont( bigBoldFont );
         const QString text = painter->fontMetrics().elidedText( track->track(), Qt::ElideRight, leftRect.width() );
         painter->drawText( leftRect, text, m_topOption );
 
         painter->setFont( m_smallFont );
         QTextDocument textDoc;
-        if ( track->album().isEmpty() )
-            textDoc.setHtml( tr( "by <b>%1</b>", "e.g. by SomeArtist" ).arg( track->artist() ) );
-        else
-            textDoc.setHtml( tr( "by <b>%1</b> on <b>%2</b>", "e.g. by SomeArtist on SomeAlbum" ).arg( track->artist() ).arg( track->album() ) );
+//        if ( track->album().isEmpty() )
+            textDoc.setHtml( tr( "<b>%1</b>", "e.g. by SomeArtist" ).arg( track->artist() ) );
+/*        else
+            textDoc.setHtml( tr( "by <b>%1</b> on <b>%2</b>", "e.g. by SomeArtist on SomeAlbum" ).arg( track->artist() ).arg( track->album() ) );*/
         textDoc.setDocumentMargin( 0 );
         textDoc.setDefaultFont( painter->font() );
         textDoc.setDefaultTextOption( m_topOption );
 
-        if ( textDoc.idealWidth() <= leftRect.width() )
-            drawRichText( painter, opt, leftRect.adjusted( 0, m_bigBoldFontMetrics.height() + 1, 0, 0 ), Qt::AlignTop, textDoc );
-
         if ( !( option.state & QStyle::State_Selected || item->isPlaying() ) )
-            painter->setPen( opt.palette.text().color().darker() );
+        {
+            QColor mid = opt.palette.mid().color();
+            //HACK: adjust small text shade based on a guess if normal text is darker or lighter
+            //      than normal background.
+            if ( opt.palette.text().color().lightness() < opt.palette.base().color().lightness() )
+                painter->setPen( mid.darker( 140 ) );
+            else
+                painter->setPen( mid.lighter( 140 ) );
+        }
 
+        if ( textDoc.idealWidth() <= leftRect.width() )
+            drawRichText( painter, opt, leftRect.adjusted( 0, QFontMetrics( bigBoldFont ).height() + 1, 0, 0 ), Qt::AlignTop, textDoc );
+
+        //TODO: replace usage of lowerText which is not drawn any more with appropriate loveBox/sentBox style boxes
         textDoc.setHtml( lowerText );
         textDoc.setDocumentMargin( 0 );
         textDoc.setDefaultFont( painter->font() );
@@ -222,7 +211,54 @@ PlaylistLargeItemDelegate::paint( QPainter* painter, const QStyleOptionViewItem&
         if ( textDoc.idealWidth() > leftRect.width() )
             textDoc.setHtml( item->query()->queryTrack()->socialActionDescription( "Love", Track::Short ) );
 
-        drawRichText( painter, opt, leftRect, Qt::AlignBottom, textDoc );
+//        drawRichText( painter, opt, leftRect, Qt::AlignBottom, textDoc );
+
+        leftRect = rightRect.adjusted( -128, 4, 0, -4 );
+        leftRect.setWidth( 96 );
+        if ( m_mode == Inbox )
+        {
+            QDateTime earliestTimestamp = QDateTime::currentDateTime();
+            QList< Tomahawk::source_ptr > sources;
+            foreach ( const Tomahawk::SocialAction& sa, item->query()->queryTrack()->socialActions( "Inbox", QVariant() /*neither true nor false!*/, true ) )
+            {
+                QDateTime saTimestamp = QDateTime::fromTime_t( sa.timestamp.toInt() );
+                if ( saTimestamp < earliestTimestamp && saTimestamp.toTime_t() > 0 )
+                    earliestTimestamp = saTimestamp;
+
+                sources << sa.source;
+            }
+
+            QString timeString = TomahawkUtils::ageToString( earliestTimestamp, true );
+
+            drawGenericBox( painter, opt, leftRect, timeString, sources, index );
+        }
+        else if ( m_mode == RecentlyPlayed )
+        {
+            if ( item->playbackLog().source )
+            {
+                QList< Tomahawk::source_ptr > sources;
+                sources << item->playbackLog().source;
+
+                QString playtime = TomahawkUtils::ageToString( QDateTime::fromTime_t( item->playbackLog().timestamp ), true );
+
+                drawGenericBox( painter, opt, leftRect, playtime, sources, index );
+            }
+        }
+        else if ( m_mode == LatestAdditions )
+        {
+            if ( item->query()->numResults() )
+            {
+                QList< Tomahawk::source_ptr > sources;
+
+                QString modtime = TomahawkUtils::ageToString( QDateTime::fromTime_t( item->query()->results().first()->modificationTime() ), true );
+
+                drawGenericBox( painter, opt, leftRect, modtime, sources, index );
+            }
+        }
+        else
+        {
+            drawLoveBox( painter, leftRect, item, index );
+        }
 
         if ( track->duration() > 0 )
         {

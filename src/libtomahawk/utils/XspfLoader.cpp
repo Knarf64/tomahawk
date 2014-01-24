@@ -59,15 +59,21 @@ XSPFLoader::errorToString( XSPFErrorCode error )
 }
 
 
-XSPFLoader::XSPFLoader( bool autoCreate, bool autoUpdate, QObject* parent )
+XSPFLoader::XSPFLoader( bool autoCreate, bool autoUpdate, QObject* parent, const QString& guid )
     : QObject( parent )
     , m_autoCreate( autoCreate )
     , m_autoUpdate( autoUpdate )
     , m_autoResolve( true )
     , m_autoDelete( true )
+    , m_guid( guid )
     , m_NS( "http://xspf.org/ns/0/" )
 {
     qRegisterMetaType< XSPFErrorCode >("XSPFErrorCode");
+
+    if ( m_guid.isEmpty() )
+    {
+        m_guid = uuid();
+    }
 }
 
 
@@ -83,6 +89,27 @@ XSPFLoader::setOverrideTitle( const QString& newTitle )
 }
 
 
+void
+XSPFLoader::setAutoResolveTracks( bool autoResolve )
+{
+    m_autoResolve = autoResolve;
+}
+
+
+void
+XSPFLoader::setAutoDelete( bool autoDelete )
+{
+    m_autoDelete = autoDelete;
+}
+
+
+void
+XSPFLoader::setErrorTitle( const QString& error)
+{
+   m_errorTitle = error;
+}
+
+
 QList< Tomahawk::query_ptr >
 XSPFLoader::entries() const
 {
@@ -94,6 +121,22 @@ QString
 XSPFLoader::title() const
 {
     return m_title;
+}
+
+playlist_ptr XSPFLoader::getPlaylistForRecentUrl()
+{
+    m_playlist = Playlist::create( SourceList::instance()->getLocal(),
+                                   m_guid,
+                                   m_title,
+                                   m_info,
+                                   m_creator,
+                                   false,
+                                   m_entries );
+
+    // 10 minute default---for now, no way to change it
+    new Tomahawk::XspfUpdater( m_playlist, 600000, m_autoUpdate, m_url.toString() );
+
+    return m_playlist;
 }
 
 
@@ -233,11 +276,13 @@ XSPFLoader::gotBody()
             }
             else if ( n.namespaceURI() == m_NS && n.localName() == "url" )
             {
-                url = n.text();
+                if ( !n.text().startsWith( "http" ) || TomahawkUtils::whitelistedHttpResultHint( n.text() ) )
+                    url = n.text();
             }
             else if ( n.namespaceURI() == m_NS && n.localName() == "location" )
             {
-                url = n.text();
+                if ( !n.text().startsWith( "http" ) || TomahawkUtils::whitelistedHttpResultHint( n.text() ) )
+                    url = n.text();
             }
         }
 
@@ -281,17 +326,7 @@ XSPFLoader::gotBody()
 
     if ( m_autoCreate )
     {
-        m_playlist = Playlist::create( SourceList::instance()->getLocal(),
-                                       uuid(),
-                                       m_title,
-                                       m_info,
-                                       m_creator,
-                                       false,
-                                       m_entries );
-
-        // 10 minute default---for now, no way to change it
-        new Tomahawk::XspfUpdater( m_playlist, 600000, m_autoUpdate, m_url.toString() );
-        emit ok( m_playlist );
+        emit ok( getPlaylistForRecentUrl() );
     }
     else
     {

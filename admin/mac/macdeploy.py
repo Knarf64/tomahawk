@@ -200,7 +200,7 @@ QT_PLUGINS = [
 ]
 
 TOMAHAWK_PLUGINS = [
-  'libtomahawk_account_xmpp.so',
+  'libtomahawk_account_xmpp.dylib',
   'libtomahawk_account_google.so',
   'libtomahawk_account_twitter.so',
   'libtomahawk_account_zeroconf.so',
@@ -214,6 +214,8 @@ TOMAHAWK_PLUGINS = [
   'libtomahawk_infoplugin_newreleases.so',
   'libtomahawk_infoplugin_rovi.so',
   'libtomahawk_infoplugin_spotify.so',
+  'libtomahawk_viewpage_dashboard.so',
+  'libtomahawk_viewpage_networkactivity.so',
 ]
 
 QT_PLUGINS_SEARCH_PATH=[

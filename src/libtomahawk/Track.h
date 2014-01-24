@@ -53,11 +53,12 @@ public:
 
     virtual ~Track();
 
-    // void setArtist( const QString& artist ) { m_artist = artist; updateSortNames(); }
+    void setArtist( const QString& artist );
     void setAlbum( const QString& album );
-    // void setTrack( const QString& track ) { m_track = track; updateSortNames(); }
+    void setTrack( const QString& track );
+
+    void setAlbumPos( unsigned int albumpos );
     // void setDuration( int duration ) { m_duration = duration; }
-    // void setAlbumPos( unsigned int albumpos ) { m_albumpos = albumpos; }
     // void setDiscNumber( unsigned int discnumber ) { m_discnumber = discnumber; }
     // void setComposer( const QString& composer ) { m_composer = composer; updateSortNames(); }
 
@@ -97,6 +98,7 @@ public:
 
     void loadAttributes();
     QVariantMap attributes() const;
+    void setAttributes( const QVariantMap& map );
 
     void loadStats();
     QList< Tomahawk::PlaybackLog > playbackHistory( const Tomahawk::source_ptr& source = Tomahawk::source_ptr() ) const;
@@ -105,9 +107,10 @@ public:
     unsigned int chartPosition() const;
     unsigned int chartCount() const;
 
-    void loadSocialActions();
+    void loadSocialActions( bool force = false );
     QList< Tomahawk::SocialAction > allSocialActions() const;
-    QString socialActionDescription( const QString& action, DescriptionMode mode ) const;
+    QList< Tomahawk::SocialAction > socialActions( const QString& actionName, const QVariant& value = QVariant(), bool filterDupeSourceNames = false );
+    QString socialActionDescription( const QString& actionName, DescriptionMode mode ) const;
 
     QList<Tomahawk::query_ptr> similarTracks() const;
     QStringList lyrics() const;

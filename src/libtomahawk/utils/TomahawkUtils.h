@@ -165,6 +165,11 @@ namespace TomahawkUtils
     DLLEXPORT QString md5( const QByteArray& data );
     DLLEXPORT bool removeDirectory( const QString& dir );
 
+    /**
+      * Check if this URL refers to a http-Result.
+      *
+      * Attention: This only checks for a http result, not a httpS result.
+      */
     DLLEXPORT bool isHttpResult( const QString& url );
     DLLEXPORT bool isLocalResult( const QString& url );
 
@@ -179,7 +184,7 @@ namespace TomahawkUtils
     // Used by the above, not exported
     void copyWithAuthentication( const QString& srcFile, const QDir dest, QObject* receiver );
 
-    DLLEXPORT bool whitelistedHttpResultHint( const QString& url );
+    DLLEXPORT bool whitelistedHttpResultHint( const QUrl& url );
 
     DLLEXPORT int compareVersionStrings( const QString& first, const QString& second );
 

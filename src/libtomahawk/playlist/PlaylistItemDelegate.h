@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,8 +22,10 @@
 
 #include <QStyledItemDelegate>
 #include <QTextOption>
+#include <QTextDocument>
 
 #include "DllMacro.h"
+#include "Typedefs.h"
 
 class TrackModel;
 class PlayableItem;
@@ -64,9 +67,28 @@ protected:
     QRect drawInfoButton( QPainter* painter, const QRect& rect, const QModelIndex& index, float height ) const;
     QRect drawSourceIcon( QPainter* painter, const QRect& rect, PlayableItem* item, float height ) const;
     QRect drawCover( QPainter* painter, const QRect& rect, PlayableItem* item, const QModelIndex& index ) const;
+    QRect drawLoveBox( QPainter* painter,
+                       const QRect& rect,
+                       PlayableItem* item,
+                       const QModelIndex& index ) const;
+    QRect drawGenericBox( QPainter* painter,
+                          const QStyleOptionViewItem& option,
+                          const QRect& rect,
+                          const QString& text,
+                          const QList< Tomahawk::source_ptr >& sources,
+                          const QModelIndex& index ) const;
+    void drawRectForBox( QPainter* painter, const QRect& rect ) const;
+    void drawAvatarsForBox( QPainter* painter,
+                            const QRect& avatarsRect,
+                            int avatarSize,
+                            int avatarMargin,
+                            int count,
+                            const QList< Tomahawk::source_ptr >& sources,
+                            const QModelIndex& index ) const;
+    void drawRichText( QPainter* painter, const QStyleOptionViewItem& option, const QRect& rect, int flags, QTextDocument& text ) const;
 
     void paintDetailed( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
-    void paintShort( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index, bool useAvatars = false ) const;
+    void paintShort( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
 
     QTextOption m_topOption;
     QTextOption m_bottomOption;
@@ -87,6 +109,8 @@ protected slots:
 private:
     mutable QHash< QPersistentModelIndex, QSharedPointer< Tomahawk::PixmapDelegateFader > > m_pixmaps;
     mutable QHash< QPersistentModelIndex, QRect > m_infoButtonRects;
+    mutable QHash< QPersistentModelIndex, QRect > m_loveButtonRects;
+    mutable QHash< QPersistentModelIndex, QHash< Tomahawk::source_ptr, QRect > > m_avatarBoxRects;
     QPersistentModelIndex m_hoveringOver;
 
     TrackView* m_view;

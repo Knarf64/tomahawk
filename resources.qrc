@@ -96,9 +96,6 @@
         <file>data/icons/tomahawk-icon-128x128.png</file>
         <file>data/icons/tomahawk-icon-256x256.png</file>
         <file>data/icons/tomahawk-icon-512x512.png</file>
-        <file>data/www/auth.html</file>
-        <file>data/www/auth.na.html</file>
-        <file>data/www/tomahawk_banner_small.png</file>
         <file>data/sql/dbmigrate-22_to_23.sql</file>
         <file>data/sql/dbmigrate-23_to_24.sql</file>
         <file>data/sql/dbmigrate-24_to_25.sql</file>
@@ -127,7 +124,7 @@
         <file>data/images/spotifycore-logo.png</file>
         <file>data/images/share.svg</file>
         <file>data/images/process-stop.svg</file>
-        <file>data/icons/tomahawk-icon-128x128-grayscale.png</file>
+        <file>data/icons/tomahawk-grayscale-icon-128x128.png</file>
         <file>data/images/collection.svg</file>
         <file>data/misc/tomahawk_pubkey.pem</file>
         <file>data/images/jump-link.svg</file>
@@ -156,9 +153,22 @@
         <file>data/images/network-activity.svg</file>
         <file>data/fonts/TitilliumWeb-Bold.ttf</file>
         <file>data/fonts/TitilliumWeb-Regular.ttf</file>
-        <file>data/fonts/FaunaOne-Regular.ttf</file>
         <file>data/fonts/PathwayGothicOne-Regular.ttf</file>
         <file>data/js/cryptojs-core.js</file>
         <file>data/js/cryptojs-sha256.js</file>
+        <file>data/sql/dbmigrate-29_to_30.sql</file>
+        <file>data/sql/dbmigrate-30_to_31.sql</file>
+        <file>data/images/trending.svg</file>
+        <file>data/www/auth.html</file>
+        <file>data/www/auth.na.html</file>
+        <file>data/www/tomahawk_auth_logo.png</file>
+        <file>data/www/css/animate.css</file>
+        <file>data/www/css/bootstrap.css</file>
+        <file>data/www/css/elements.css</file>
+        <file>data/www/css/font-awesome.css</file>
+        <file>data/www/css/style.css</file>
+        <file>data/www/js/html5shim.js</file>
+        <file>data/images/splash.svg</file>
+        <file>data/images/splash-unrounded.svg</file>
     </qresource>
 </RCC>

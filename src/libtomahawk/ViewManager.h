@@ -1,6 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
@@ -25,6 +25,7 @@
 #include "PlaylistInterface.h"
 #include "playlist/QueueView.h"
 #include "ViewPage.h"
+#include "ViewPagePlugin.h"
 
 #include <QObject>
 #include <QHash>
@@ -115,6 +116,8 @@ public:
 
     FlexibleView* createPageForList( const QString& title, const QList< Tomahawk::query_ptr >& queries );
 
+    void addDynamicPage( Tomahawk::ViewPagePlugin* viewPage, const QString& pageName = QString() );
+
 signals:
     void filterAvailable( bool b );
 
@@ -132,7 +135,7 @@ signals:
     void historyBackAvailable( bool avail );
     void historyForwardAvailable( bool avail );
 
-    void viewPageAdded( const QString& pageName, const QString& text, const QIcon& icon );
+    void viewPageAdded( const QString& pageName, Tomahawk::ViewPage* page, int sortValue );
 
 public slots:
     Tomahawk::ViewPage* showSuperCollection();
@@ -141,7 +144,7 @@ public slots:
     Tomahawk::ViewPage* showRecentPlaysPage();
     Tomahawk::ViewPage* showInboxPage();
 
-    void addDynamicPage( const QString& pageName, const QString& text, const QIcon& icon, boost::function< Tomahawk::ViewPage*() > instanceLoader );
+//    void addDynamicPage( const QString& pageName, const QString& text, const QIcon& icon, boost::function< Tomahawk::ViewPage*() > instanceLoader, int sortValue = 0 );
     Tomahawk::ViewPage* showDynamicPage( const QString& pageName );
 
     void showCurrentTrack();
@@ -161,6 +164,7 @@ public slots:
     QList< Tomahawk::ViewPage* > allPages() const;
     QList< Tomahawk::ViewPage* > historyPages() const;
     void destroyPage( Tomahawk::ViewPage* page );
+    bool destroyCurrentPage();
 
     void showQueue() { emit showQueueRequested(); }
     void hideQueue() { emit hideQueueRequested(); }
@@ -196,6 +200,7 @@ private:
     InboxModel* m_inboxModel;
 
     QHash< QString, Tomahawk::ViewPage* > m_dynamicPages;
+    QHash< QString, QPointer< Tomahawk::ViewPagePlugin > > m_dynamicPagePlugins;
     QHash< QString, boost::function< Tomahawk::ViewPage*() > > m_dynamicPagesInstanceLoaders;
 
     QList< Tomahawk::collection_ptr > m_superCollections;

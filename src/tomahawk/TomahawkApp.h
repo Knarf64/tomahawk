@@ -3,6 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2014,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -25,14 +26,12 @@
 
 #include "mac/TomahawkApp_Mac.h" // for PlatforInterface
 #include "Typedefs.h"
+#include "libtomahawk-playdarapi/PlaydarApi.h"
 #include "utils/TomahawkUtils.h"
 #include "thirdparty/kdsingleapplicationguard/kdsingleapplicationguard.h"
 
 #include "HeadlessCheck.h"
 #include "config.h"
-
-#include <QxtWeb/QxtHttpServerConnector>
-#include <QxtWeb/HttpSessionManager>
 
 #include <QRegExp>
 #include <QFile>
@@ -47,6 +46,7 @@ class Servent;
 class SipHandler;
 class TomahawkSettings;
 class AudioControls;
+class SplashWidget;
 
 namespace Tomahawk
 {
@@ -116,6 +116,14 @@ private slots:
     void spotifyApiCheckFinished();
     void onInfoSystemReady();
 
+    void onSchemaUpdateStarted();
+    void onSchemaUpdateStatus( const QString& status );
+    void onSchemaUpdateDone();
+
+    void startSplashWidget( const QString& initialMessage = QString() );
+    void updateSplashWidgetMessage( const QString& message );
+    void killSplashWidget();
+
     void ipDetectionFailed( QNetworkReply::NetworkError error, QString errorString );
 
 private:
@@ -145,11 +153,11 @@ private:
 #ifndef TOMAHAWK_HEADLESS
     TomahawkWindow* m_mainwindow;
 #endif
+    QPointer<PlaydarApi> playdarApi;
+
+    SplashWidget* m_splashWidget;
 
     bool m_headless;
-
-    QPointer< QxtHttpServerConnector > m_httpv1_connector;
-    QPointer< QxtHttpSessionManager > m_httpv1_session;
 };
 
 Q_DECLARE_METATYPE( PairList )

@@ -59,9 +59,9 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QLabel" name="albumLabel">
+        <widget class="ScrollingLabel" name="albumLabel">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+          <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -113,25 +113,6 @@
         </spacer>
        </item>
       </layout>
-     </item>
-     <item>
-      <widget class="QTextBrowser" name="biography">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>190</height>
-        </size>
-       </property>
-       <property name="horizontalScrollBarPolicy">
-        <enum>Qt::ScrollBarAlwaysOff</enum>
-       </property>
-      </widget>
      </item>
     </layout>
    </item>
@@ -335,7 +316,7 @@
   <customwidget>
    <class>GridView</class>
    <extends>QListView</extends>
-   <header location="global">playlist/GridView.h</header>
+   <header>playlist/GridView.h</header>
   </customwidget>
   <customwidget>
    <class>PlayableCover</class>
@@ -343,14 +324,19 @@
    <header>widgets/PlayableCover.h</header>
   </customwidget>
   <customwidget>
-   <class>TrackView</class>
-   <extends>QTreeView</extends>
-   <header>playlist/TrackView.h</header>
-  </customwidget>
-  <customwidget>
    <class>QueryLabel</class>
    <extends>QLabel</extends>
    <header>widgets/QueryLabel.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ScrollingLabel</class>
+   <extends>QLabel</extends>
+   <header location="global">widgets/ScrollingLabel.h</header>
+  </customwidget>
+  <customwidget>
+   <class>TrackView</class>
+   <extends>QTreeView</extends>
+   <header>playlist/TrackView.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

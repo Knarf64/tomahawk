@@ -19,6 +19,7 @@
 #ifndef ZEROCONF_ACCOUNTS_H
 #define ZEROCONF_ACCOUNTS_H
 
+#include "TomahawkPlugin.h"
 #include "Zeroconf.h"
 #include "accounts/Account.h"
 #include "accounts/AccountDllMacro.h"
@@ -32,8 +33,10 @@ namespace Accounts
 
 class ACCOUNTDLLEXPORT ZeroconfFactory : public AccountFactory
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.AccountFactory" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::Accounts::AccountFactory )
+
 public:
     ZeroconfFactory();
     virtual ~ZeroconfFactory();
@@ -66,7 +69,7 @@ public:
     ConnectionState connectionState() const;
 
     virtual Tomahawk::InfoSystem::InfoPluginPtr infoPlugin() { return Tomahawk::InfoSystem::InfoPluginPtr(); }
-    SipPlugin* sipPlugin();
+    SipPlugin* sipPlugin( bool create = true );
 
     AccountConfigWidget* configurationWidget() { return 0; }
     QWidget* aclWidget() { return 0; }

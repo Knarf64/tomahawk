@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2014,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -58,6 +59,7 @@ ColumnView::ColumnView( QWidget* parent )
     , m_previewWidget( new ColumnViewPreviewWidget( this ) )
     , m_updateContextView( true )
     , m_contextMenu( new ContextMenu( this ) )
+    , m_scrollDelta( 0 )
 {
     setFrameShape( QFrame::NoFrame );
     setAttribute( Qt::WA_MacShowFocusRect, 0 );
@@ -73,6 +75,7 @@ ColumnView::ColumnView( QWidget* parent )
     setSelectionBehavior( QAbstractItemView::SelectRows );
     setContextMenuPolicy( Qt::CustomContextMenu );
     setProxyModel( new TreeProxyModel( this ) );
+
     setPreviewWidget( m_previewWidget );
 
     m_timer.setInterval( SCROLL_TIMEOUT );
@@ -152,7 +155,8 @@ ColumnView::setTreeModel( TreeModel* model )
     sortByColumn( PlayableModel::Artist, Qt::AscendingOrder );*/
 
     QList< int > widths;
-    widths << m_previewWidget->minimumSize().width() + 32;
+    int baseUnit = m_previewWidget->minimumSize().width() + 32;
+    widths << baseUnit << baseUnit << baseUnit << baseUnit;
     setColumnWidths( widths );
 }
 
@@ -454,8 +458,41 @@ ColumnView::guid() const
 
 
 void
+ColumnView::fixScrollBars()
+{
+    foreach ( QObject* widget, children() )
+    {
+        foreach ( QObject* view, widget->children() )
+        {
+            QScrollBar* sb = qobject_cast< QScrollBar* >( view );
+            if ( sb && sb->orientation() == Qt::Horizontal )
+            {
+                sb->setSingleStep( 6 );
+            }
+
+            foreach ( QObject* subviews, view->children() )
+            {
+                foreach ( QObject* scrollbar, subviews->children() )
+                {
+                    QScrollBar* sb = qobject_cast< QScrollBar* >( scrollbar );
+                    if ( sb && sb->orientation() == Qt::Vertical )
+                    {
+                        sb->setSingleStep( 6 );
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+void
 ColumnView::onUpdatePreviewWidget( const QModelIndex& index )
 {
+    fixScrollBars();
+
     PlayableItem* item = m_proxyModel->itemFromIndex( m_proxyModel->mapToSource( index ) );
     if ( !item || !item->result() )
     {

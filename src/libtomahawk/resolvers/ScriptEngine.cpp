@@ -49,7 +49,7 @@ ScriptEngine::ScriptEngine( JSResolver* parent )
     m_header = QWebPage::userAgentForUrl( QUrl() ).replace( QString( "%1/%2" )
                .arg( TOMAHAWK_APPLICATION_NAME )
                .arg( TOMAHAWK_VERSION )
-               ,"");
+               , "" );
     tLog( LOGVERBOSE ) << "JSResolver Using header" << m_header;
 
     connect( networkAccessManager(), SIGNAL( sslErrors( QNetworkReply*, QList<QSslError> ) ),
@@ -60,9 +60,10 @@ ScriptEngine::ScriptEngine( JSResolver* parent )
 void
 ScriptEngine::javaScriptConsoleMessage( const QString& message, int lineNumber, const QString& sourceID )
 {
-    tLog() << "JAVASCRIPT:" << m_scriptPath << message << lineNumber << sourceID;
+    tLog() << "JAVASCRIPT:" << QString( "%1:%2" ).arg( m_scriptPath ).arg( lineNumber ) << message << sourceID;
     #ifdef QT_DEBUG
-    JobStatusView::instance()->model()->addJob( new ErrorStatusMessage( tr( "Script Resolver Error: %1 %2 %3 %4" ).arg( m_scriptPath ).arg( message ).arg( lineNumber ).arg( sourceID ) ) );
+    QFileInfo scriptPath( m_scriptPath );
+    JobStatusView::instance()->model()->addJob( new ErrorStatusMessage( tr( "Resolver Error: %1:%2 %3" ).arg( scriptPath.fileName() ).arg( lineNumber ).arg( message ) ) );
     #endif
 }
 
